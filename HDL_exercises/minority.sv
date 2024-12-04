@@ -1,5 +1,3 @@
-/* verilator lint_off WIDTHTRUNC */
-
 module minority (
     input  logic a,
     b,
