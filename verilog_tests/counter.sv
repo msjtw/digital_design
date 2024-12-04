@@ -4,15 +4,6 @@ module counter (
     reset
 );
 
-  always @(posedge ) begin
-
-  end
-
-
-
-
-
-
   parameter WIDTH = 8;
 
   output [WIDTH-1 : 0] out;
