@@ -17,17 +17,7 @@ module mux8 (
       .y(t1)
   );
 
-  assign y = ~s[2] & t1 | s[2] & t0;
-
-endmodule
-
-module mux2 (
-    input logic s,
-    input logic [1:0] d,
-    output logic y
-);
-
-  assign y = ~s & d[0] | s & d[1];
+  assign y = ~s[2] & t0 | s[2] & t1;
 
 endmodule
 
@@ -41,27 +31,37 @@ module mux4 (
 
 endmodule
 
-module mux8_tb ();
-  logic [2:0] s;
-  logic [7:0] d;
-  logic y;
-  mux8 duv (
-      .s(s),
-      .d(d),
-      .y(y)
-  );
+module mux2 (
+    input logic s,
+    input logic [1:0] d,
+    output logic y
+);
 
-  initial begin
-    d = 8'b01010101;
-    $monitor("%h %h %h", s, d, y);
-    for (int i = 0; i < 8; i++) begin
-      s = i;
-      #1;
-    end
-
-  end
+  assign y = ~s & d[0] | s & d[1];
 
 endmodule
+
+// module mux8_tb ();
+//   logic [2:0] s;
+//   logic [7:0] d;
+//   logic y;
+//   mux8 duv (
+//       .s(s),
+//       .d(d),
+//       .y(y)
+//   );
+//
+//   initial begin
+//     d = 8'b01010101;
+//     $monitor("%h %h %h", s, d, y);
+//     for (int i = 0; i < 8; i++) begin
+//       s = i;
+//       #1;
+//     end
+//
+//   end
+//
+// endmodule
 
 
 
