@@ -1,5 +1,5 @@
 module extend (
-    input  logic [31:0] instr,
+    input  logic [31:7] instr,
     input  logic [ 2:0] imm_src,
     output logic [31:0] imm_ext
 );
