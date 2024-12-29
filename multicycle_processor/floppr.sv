@@ -1,5 +1,5 @@
 module floppr #(
-    parameter int WIDTH = 8
+    parameter int WIDTH = 32
 ) (
     input logic clk,
     reset,

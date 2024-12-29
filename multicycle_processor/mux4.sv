@@ -1,5 +1,5 @@
 module mux4 #(
-    parameter int WIDTH = 8
+    parameter int WIDTH = 32
 ) (
     input logic [WIDTH-1:0] d0,
     d1,

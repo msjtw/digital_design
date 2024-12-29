@@ -36,7 +36,6 @@ module riscvmulti (
       .Instr(Instr),
       .PCWrite(PCwrite),
       .AdrSrc(AdrSrc),
-      .MemWrite(MemWrite),
       .IRWrite(IRWrite),
       .RegWrite(RegWrite),
       .ResultSrc(ResultSrc),
