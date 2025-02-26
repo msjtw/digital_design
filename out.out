@@ -4398,3 +4398,592 @@ and 00000000000000000000000000001001
   = 00000000000000000000000000001001
 
 
+{ {
+    _log_prefix = "LSP[veridian]",
+    _on_attach_cbs = { <function 1> },
+    _on_exit_cbs = { <function 2>, <function 3> },
+    _on_init_cbs = { <function 4> },
+    _trace = "off",
+    attached_buffers = { true,
+      [6] = true,
+      [18] = true,
+      [19] = true
+    },
+    cancel_request = <function 5>,
+    capabilities = <1>{
+      general = {
+        positionEncodings = { "utf-16" }
+      },
+      textDocument = {
+        callHierarchy = {
+          dynamicRegistration = false
+        },
+        codeAction = {
+          codeActionLiteralSupport = {
+            codeActionKind = {
+              valueSet = { "", "quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports" }
+            }
+          },
+          dataSupport = true,
+          dynamicRegistration = true,
+          isPreferredSupport = true,
+          resolveSupport = {
+            properties = { "edit" }
+          }
+        },
+        completion = {
+          completionItem = {
+            commitCharactersSupport = false,
+            deprecatedSupport = false,
+            documentationFormat = { "markdown", "plaintext" },
+            preselectSupport = false,
+            snippetSupport = false
+          },
+          completionItemKind = {
+            valueSet = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25 }
+          },
+          completionList = {
+            itemDefaults = { "editRange", "insertTextFormat", "insertTextMode", "data" }
+          },
+          contextSupport = false,
+          dynamicRegistration = false
+        },
+        declaration = {
+          linkSupport = true
+        },
+        definition = {
+          dynamicRegistration = true,
+          linkSupport = true
+        },
+        diagnostic = {
+          dynamicRegistration = false
+        },
+        documentHighlight = {
+          dynamicRegistration = false
+        },
+        documentSymbol = {
+          dynamicRegistration = false,
+          hierarchicalDocumentSymbolSupport = true,
+          symbolKind = {
+            valueSet = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26 }
+          }
+        },
+        formatting = {
+          dynamicRegistration = true
+        },
+        hover = {
+          contentFormat = { "markdown", "plaintext" },
+          dynamicRegistration = true
+        },
+        implementation = {
+          linkSupport = true
+        },
+        inlayHint = {
+          dynamicRegistration = true,
+          resolveSupport = {
+            properties = { "textEdits", "tooltip", "location", "command" }
+          }
+        },
+        publishDiagnostics = {
+          dataSupport = true,
+          relatedInformation = true,
+          tagSupport = {
+            valueSet = { 1, 2 }
+          }
+        },
+        rangeFormatting = {
+          dynamicRegistration = true
+        },
+        references = {
+          dynamicRegistration = false
+        },
+        rename = {
+          dynamicRegistration = true,
+          prepareSupport = true
+        },
+        semanticTokens = {
+          augmentsSyntaxTokens = true,
+          dynamicRegistration = false,
+          formats = { "relative" },
+          multilineTokenSupport = false,
+          overlappingTokenSupport = true,
+          requests = {
+            full = {
+              delta = true
+            },
+            range = false
+          },
+          serverCancelSupport = false,
+          tokenModifiers = { "declaration", "definition", "readonly", "static", "deprecated", "abstract", "async", "modification", "documentation", "defaultLibrary" },
+          tokenTypes = { "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable", "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment", "string", "number", "regexp", "operator", "decorator" }
+        },
+        signatureHelp = {
+          dynamicRegistration = false,
+          signatureInformation = {
+            activeParameterSupport = true,
+            documentationFormat = { "markdown", "plaintext" },
+            parameterInformation = {
+              labelOffsetSupport = true
+            }
+          }
+        },
+        synchronization = {
+          didSave = true,
+          dynamicRegistration = false,
+          willSave = true,
+          willSaveWaitUntil = true
+        },
+        typeDefinition = {
+          linkSupport = true
+        }
+      },
+      window = {
+        showDocument = {
+          support = true
+        },
+        showMessage = {
+          messageActionItem = {
+            additionalPropertiesSupport = false
+          }
+        },
+        workDoneProgress = true
+      },
+      workspace = {
+        applyEdit = true,
+        configuration = true,
+        didChangeConfiguration = {
+          dynamicRegistration = false
+        },
+        didChangeWatchedFiles = {
+          dynamicRegistration = false,
+          relativePatternSupport = true
+        },
+        inlayHint = {
+          refreshSupport = true
+        },
+        semanticTokens = {
+          refreshSupport = true
+        },
+        symbol = {
+          dynamicRegistration = false,
+          symbolKind = {
+            valueSet = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26 }
+          }
+        },
+        workspaceEdit = {
+          resourceOperations = { "rename", "create", "delete" }
+        },
+        workspaceFolders = true
+      }
+    },
+    commands = {},
+    config = {
+      autostart = true,
+      capabilities = <table 1>,
+      cmd = { "/home/msjtw/.cargo/bin/veridian" },
+      cmd_cwd = "/home/msjtw/Documents/digital_design",
+      filetypes = { "systemverilog", "verilog" },
+      handlers = <2>{},
+      init_options = <3>vim.empty_dict(),
+      log_level = 2,
+      message_level = 2,
+      name = "veridian",
+      on_attach = <function 1>,
+      on_exit = <function 2>,
+      on_init = <function 4>,
+      root_dir = "/home/msjtw/Documents/digital_design",
+      settings = <4>vim.empty_dict(),
+      workspace_folders = <5>{ {
+          name = "/home/msjtw/Documents/digital_design",
+          uri = "file:///home/msjtw/Documents/digital_design"
+        } },
+      <metatable> = <6>{
+        __tostring = <function 6>
+      }
+    },
+    dynamic_capabilities = {
+      capabilities = {},
+      client_id = 1,
+      <metatable> = {
+        __index = <7>{
+          get = <function 7>,
+          match = <function 8>,
+          new = <function 9>,
+          register = <function 10>,
+          supports = <function 11>,
+          supports_registration = <function 12>,
+          unregister = <function 13>
+        }
+      }
+    },
+    flags = {},
+    get_language_id = <function 14>,
+    handlers = <table 2>,
+    id = 1,
+    initialized = true,
+    is_stopped = <function 15>,
+    messages = {
+      messages = {},
+      name = "veridian",
+      progress = {},
+      status = {}
+    },
+    name = "veridian",
+    notify = <function 16>,
+    offset_encoding = "utf-16",
+    on_attach = <function 17>,
+    progress = {
+      _idx_read = 0,
+      _idx_write = 0,
+      _items = {},
+      _size = 51,
+      pending = {},
+      <metatable> = {
+        __call = <function 18>,
+        __index = <8>{
+          clear = <function 19>,
+          peek = <function 20>,
+          pop = <function 21>,
+          push = <function 22>
+        }
+      }
+    },
+    request = <function 23>,
+    request_sync = <function 24>,
+    requests = {},
+    root_dir = "/home/msjtw/Documents/digital_design",
+    rpc = {
+      is_closing = <function 25>,
+      notify = <function 26>,
+      request = <function 27>,
+      terminate = <function 28>
+    },
+    server_capabilities = {
+      completionProvider = {
+        resolveProvider = false,
+        triggerCharacters = { ".", "$", "`" }
+      },
+      definitionProvider = true,
+      documentFormattingProvider = true,
+      documentHighlightProvider = true,
+      documentRangeFormattingProvider = true,
+      documentSymbolProvider = true,
+      hoverProvider = true,
+      textDocumentSync = {
+        change = 2,
+        openClose = true,
+        save = vim.empty_dict()
+      }
+    },
+    settings = <table 4>,
+    stop = <function 29>,
+    supports_method = <function 30>,
+    workspace_did_change_configuration = <function 31>,
+    workspace_folders = <table 5>,
+    <metatable> = <9>{
+      __index = <table 9>,
+      _add_workspace_folder = <function 32>,
+      _cancel_request = <function 33>,
+      _exec_cmd = <function 34>,
+      _is_stopped = <function 35>,
+      _notification = <function 36>,
+      _notify = <function 37>,
+      _on_attach = <function 38>,
+      _on_error = <function 39>,
+      _on_exit = <function 40>,
+      _remove_workspace_folder = <function 41>,
+      _request = <function 42>,
+      _request_sync = <function 43>,
+      _resolve_handler = <function 44>,
+      _run_callbacks = <function 45>,
+      _server_request = <function 46>,
+      _stop = <function 47>,
+      _supports_method = <function 48>,
+      _text_document_did_open_handler = <function 49>,
+      create = <function 50>,
+      initialize = <function 51>,
+      write_error = <function 52>
+    }
+  }, {
+    _log_prefix = "LSP[verible]",
+    _on_attach_cbs = { <function 53> },
+    _on_exit_cbs = { <function 54>, <function 3> },
+    _on_init_cbs = { <function 55> },
+    _trace = "off",
+    attached_buffers = { true,
+      [6] = true,
+      [18] = true,
+      [19] = true
+    },
+    cancel_request = <function 56>,
+    capabilities = <10>{
+      general = {
+        positionEncodings = { "utf-16" }
+      },
+      textDocument = {
+        callHierarchy = {
+          dynamicRegistration = false
+        },
+        codeAction = {
+          codeActionLiteralSupport = {
+            codeActionKind = {
+              valueSet = { "", "quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports" }
+            }
+          },
+          dataSupport = true,
+          dynamicRegistration = true,
+          isPreferredSupport = true,
+          resolveSupport = {
+            properties = { "edit" }
+          }
+        },
+        completion = {
+          completionItem = {
+            commitCharactersSupport = true,
+            deprecatedSupport = true,
+            documentationFormat = { "markdown", "plaintext" },
+            insertReplaceSupport = true,
+            insertTextModeSupport = {
+              valueSet = { 1, 2 }
+            },
+            labelDetailsSupport = true,
+            preselectSupport = true,
+            resolveSupport = {
+              properties = { "documentation", "additionalTextEdits", "insertTextFormat", "insertTextMode", "command" }
+            },
+            snippetSupport = true,
+            tagSupport = {
+              valueSet = { 1 }
+            }
+          },
+          completionItemKind = {
+            valueSet = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25 }
+          },
+          completionList = {
+            itemDefaults = { "commitCharacters", "editRange", "insertTextFormat", "insertTextMode", "data" }
+          },
+          contextSupport = true,
+          dynamicRegistration = false,
+          insertTextMode = 1
+        },
+        declaration = {
+          linkSupport = true
+        },
+        definition = {
+          dynamicRegistration = true,
+          linkSupport = true
+        },
+        diagnostic = {
+          dynamicRegistration = false
+        },
+        documentHighlight = {
+          dynamicRegistration = false
+        },
+        documentSymbol = {
+          dynamicRegistration = false,
+          hierarchicalDocumentSymbolSupport = true,
+          symbolKind = {
+            valueSet = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26 }
+          }
+        },
+        formatting = {
+          dynamicRegistration = true
+        },
+        hover = {
+          contentFormat = { "markdown", "plaintext" },
+          dynamicRegistration = true
+        },
+        implementation = {
+          linkSupport = true
+        },
+        inlayHint = {
+          dynamicRegistration = true,
+          resolveSupport = {
+            properties = { "textEdits", "tooltip", "location", "command" }
+          }
+        },
+        publishDiagnostics = {
+          dataSupport = true,
+          relatedInformation = true,
+          tagSupport = {
+            valueSet = { 1, 2 }
+          }
+        },
+        rangeFormatting = {
+          dynamicRegistration = true
+        },
+        references = {
+          dynamicRegistration = false
+        },
+        rename = {
+          dynamicRegistration = true,
+          prepareSupport = true
+        },
+        semanticTokens = {
+          augmentsSyntaxTokens = true,
+          dynamicRegistration = false,
+          formats = { "relative" },
+          multilineTokenSupport = false,
+          overlappingTokenSupport = true,
+          requests = {
+            full = {
+              delta = true
+            },
+            range = false
+          },
+          serverCancelSupport = false,
+          tokenModifiers = { "declaration", "definition", "readonly", "static", "deprecated", "abstract", "async", "modification", "documentation", "defaultLibrary" },
+          tokenTypes = { "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable", "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment", "string", "number", "regexp", "operator", "decorator" }
+        },
+        signatureHelp = {
+          dynamicRegistration = false,
+          signatureInformation = {
+            activeParameterSupport = true,
+            documentationFormat = { "markdown", "plaintext" },
+            parameterInformation = {
+              labelOffsetSupport = true
+            }
+          }
+        },
+        synchronization = {
+          didSave = true,
+          dynamicRegistration = false,
+          willSave = true,
+          willSaveWaitUntil = true
+        },
+        typeDefinition = {
+          linkSupport = true
+        }
+      },
+      window = {
+        showDocument = {
+          support = true
+        },
+        showMessage = {
+          messageActionItem = {
+            additionalPropertiesSupport = false
+          }
+        },
+        workDoneProgress = true
+      },
+      workspace = {
+        applyEdit = true,
+        configuration = true,
+        didChangeConfiguration = {
+          dynamicRegistration = false
+        },
+        didChangeWatchedFiles = {
+          dynamicRegistration = false,
+          relativePatternSupport = true
+        },
+        inlayHint = {
+          refreshSupport = true
+        },
+        semanticTokens = {
+          refreshSupport = true
+        },
+        symbol = {
+          dynamicRegistration = false,
+          symbolKind = {
+            valueSet = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26 }
+          }
+        },
+        workspaceEdit = {
+          resourceOperations = { "rename", "create", "delete" }
+        },
+        workspaceFolders = true
+      }
+    },
+    commands = {},
+    config = {
+      autostart = true,
+      capabilities = <table 10>,
+      cmd = { "/home/msjtw/.local/share/nvim/mason/bin/verible-verilog-ls" },
+      cmd_cwd = "/home/msjtw/Documents/digital_design",
+      filetypes = { "systemverilog", "verilog" },
+      handlers = <table 2>,
+      init_options = <table 3>,
+      log_level = 2,
+      message_level = 2,
+      name = "verible",
+      on_attach = <function 53>,
+      on_exit = <function 54>,
+      on_init = <function 55>,
+      root_dir = "/home/msjtw/Documents/digital_design",
+      settings = <table 4>,
+      workspace_folders = <11>{ {
+          name = "/home/msjtw/Documents/digital_design",
+          uri = "file:///home/msjtw/Documents/digital_design"
+        } },
+      <metatable> = <table 6>
+    },
+    dynamic_capabilities = {
+      capabilities = {},
+      client_id = 2,
+      <metatable> = {
+        __index = <table 7>
+      }
+    },
+    flags = {},
+    get_language_id = <function 14>,
+    handlers = <table 2>,
+    id = 2,
+    initialized = true,
+    is_stopped = <function 57>,
+    messages = {
+      messages = {},
+      name = "verible",
+      progress = {},
+      status = {}
+    },
+    name = "verible",
+    notify = <function 58>,
+    offset_encoding = "utf-16",
+    on_attach = <function 59>,
+    progress = {
+      _idx_read = 0,
+      _idx_write = 0,
+      _items = {},
+      _size = 51,
+      pending = {},
+      <metatable> = {
+        __call = <function 60>,
+        __index = <table 8>
+      }
+    },
+    request = <function 61>,
+    request_sync = <function 62>,
+    requests = {},
+    root_dir = "/home/msjtw/Documents/digital_design",
+    rpc = {
+      is_closing = <function 63>,
+      notify = <function 64>,
+      request = <function 65>,
+      terminate = <function 66>
+    },
+    server_capabilities = {
+      codeActionProvider = true,
+      definitionProvider = true,
+      diagnosticProvider = {
+        interFileDependencies = false,
+        workspaceDiagnostics = false
+      },
+      documentFormattingProvider = true,
+      documentHighlightProvider = true,
+      documentRangeFormattingProvider = true,
+      documentSymbolProvider = true,
+      hoverProvider = false,
+      referencesProvider = true,
+      renameProvider = true,
+      textDocumentSync = {
+        change = 2,
+        openClose = true
+      }
+    },
+    settings = <table 4>,
+    stop = <function 67>,
+    supports_method = <function 68>,
+    workspace_did_change_configuration = <function 69>,
+    workspace_folders = <table 11>,
+    <metatable> = <table 9>
+  } }

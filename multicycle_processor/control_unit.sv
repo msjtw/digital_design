@@ -12,8 +12,8 @@ module control_unit (
     output logic [1:0] ResultSrc,
     ALUSrcA,
     ALUSrcB,
-    ImmSrc,
     output logic [2:0] ALUControl,
+    ImmSrc,
 
     // Memorty
     output logic write_enable

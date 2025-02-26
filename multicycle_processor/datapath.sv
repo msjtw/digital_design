@@ -1,4 +1,3 @@
-
 module datapath (
     input logic clk,
     input logic reset,
@@ -11,8 +10,8 @@ module datapath (
     input logic [1:0] ResultSrc,
     ALUSrcA,
     ALUSrcB,
-    ImmSrc,
     input logic [2:0] ALUControl,
+    ImmSrc,
     output logic zero,
     output logic [31:0] Instr,
 
@@ -22,7 +21,7 @@ module datapath (
     Adress
 );
 
-  logic [31:0] Result;
+  logic [31:0] Result, Data;
 
   logic reg_wr_en;
   logic [31:0] reg_read_1, reg_read_2;
@@ -40,10 +39,10 @@ module datapath (
   logic [31:0] SrcA, SrcB, ALURes;
   logic [3:0] alu_flags;
   alu alu (
-      .a(alu_a),
-      .b(alu_b),
+      .a(SrcA),
+      .b(SrcB),
       .alu_control(ALUControl),
-      .res(alu_res),
+      .res(ALURes),
       .flags(alu_flags)
   );
 
@@ -56,7 +55,7 @@ module datapath (
   );
 
   mux4 adr_mux (
-      .s ({0, AdrSrc}),
+      .s ({1'b0, AdrSrc}),
       .d0(PC),
       .d1(Result),
       .y (Adress)
@@ -80,7 +79,7 @@ module datapath (
 
   floppr ReadData_reg (
       .clk(clk),
-      .en (1),
+      .en (1'b1),
       .d  (ReadData),
       .q  (Data)
   );
@@ -96,13 +95,13 @@ module datapath (
   logic [31:0] A;
   floppr reg_floppr_1 (
       .clk(clk),
-      .en (1),
+      .en (1'b1),
       .d  (reg_read_1),
       .q  (A)
   );
   floppr reg_floppr_2 (
       .clk(clk),
-      .en (1),
+      .en (1'b1),
       .d  (reg_read_2),
       .q  (WriteData)
   );
@@ -126,7 +125,7 @@ module datapath (
   logic [31:0] ALUOut;
   floppr ALU_reg (
       .clk(clk),
-      .en (1),
+      .en (1'b1),
       .d  (ALURes),
       .q  (ALUOut)
   );
