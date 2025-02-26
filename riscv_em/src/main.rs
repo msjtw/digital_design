@@ -1,9 +1,11 @@
+use instr::Instruction;
 use object::read::elf::FileHeader;
 use object::{Endian, Object, ObjectSection, elf};
 use std::env;
 use std::error::Error;
 use std::fs;
 use std::process;
+mod instr;
 
 struct ElfData {
     intructions: Vec<u32>,
@@ -56,7 +58,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("address {:x}", content.base_address);
     println!("entry {:x}", content.entry_adress);
     for a in content.intructions {
-        println!("{:8x}", a)
+        print!("{:8x}    ", a);
+        match instr::Instruction::from(a) {
+            instr::Instruction::R(x) => println!("register"),
+            instr::Instruction::I(x) => println!("immediate"),
+            instr::Instruction::U(x) => println!("upper immediate"),
+            instr::Instruction::S(x) => println!("store"),
+            instr::Instruction::B(x) => println!("branch"),
+            instr::Instruction::J(x) => println!("jump"),
+            _ => println!("nie ma takiej"),
+        };
     }
     Ok(())
 }
