@@ -1,4 +1,5 @@
 //register
+#[derive(Debug)]
 pub struct RType {
     opcode: u32,
     rd: u32,
@@ -22,12 +23,13 @@ impl RType {
 }
 
 //immediate
+#[derive(Debug)]
 pub struct IType {
     opcode: u32,
     rd: u32,
     rs1: u32,
     funct3: u32,
-    imm: u32,
+    imm: i32,
 }
 
 impl IType {
@@ -37,18 +39,39 @@ impl IType {
             rd: (byte_code & 3968) >> 7,
             rs1: (byte_code & 1015808) >> 15,
             funct3: (byte_code & 28672) >> 12,
-            imm: (byte_code & 4293918720) >> 20,
+            imm: {
+                let mut arr = [0; 32];
+                let mut imm = [0; 32];
+                for i in 0..32 {
+                    arr[i] = (byte_code & (1 << i)) >> i;
+                }
+
+                for i in 0..=11 {
+                    imm[i] = arr[i + 20];
+                }
+                for i in 12..=31 {
+                    imm[i] = imm[11]
+                }
+
+                let mut sum = 0;
+                for i in 0..32 {
+                    sum <<= 1;
+                    sum += imm[31 - i];
+                }
+                sum as i32
+            },
         }
     }
 }
 
 //strore
+#[derive(Debug)]
 pub struct SType {
     opcode: u32,
     rs1: u32,
     rs2: u32,
     funct3: u32,
-    imm: u32,
+    imm: i32,
 }
 
 impl SType {
@@ -61,35 +84,39 @@ impl SType {
             imm: {
                 let mut arr = [0; 32];
                 let mut imm = [0; 32];
-                for i in 0..31 {
-                    arr[i] = byte_code & (1 << i);
+                for i in 0..32 {
+                    arr[i] = (byte_code & (1 << i)) >> i;
                 }
 
-                for i in 11..5 {
-                    imm[i] = arr[i + 20];
+                for i in 0..=4 {
+                    imm[i] = arr[i + 7];
                 }
-                for i in 4..0 {
-                    imm[i] = arr[i + 7]
+                for i in 5..=11 {
+                    imm[i] = arr[i + 20]
+                }
+                for i in 12..=31 {
+                    imm[i] = imm[11]
                 }
 
                 let mut sum = 0;
-                for i in 0..31 {
+                for i in 0..32 {
                     sum <<= 1;
-                    sum += imm[i];
+                    sum += imm[31 - i];
                 }
-                sum
+                sum as i32
             },
         }
     }
 }
 
 //branch
+#[derive(Debug)]
 pub struct BType {
     opcode: u32,
     rs1: u32,
     rs2: u32,
     funct3: u32,
-    imm: u32,
+    imm: i32,
 }
 
 impl BType {
@@ -99,15 +126,35 @@ impl BType {
             rs1: (byte_code & 1015808) >> 15,
             rs2: (byte_code & 32505856) >> 20,
             funct3: (byte_code & 28672) >> 12,
-            imm: ((byte_code & 2147483648) >> 19)
-                + ((byte_code & 127) << 4)
-                + ((byte_code & 2113929216) >> 20)
-                + ((byte_code & 3840) >> 7),
+            imm: {
+                let mut arr = [0; 32];
+                let mut imm = [0; 32];
+                for i in 0..32 {
+                    arr[i] = (byte_code & (1 << i)) >> i;
+                }
+
+                for i in 1..=4 {
+                    imm[i] = arr[i + 7];
+                }
+                for i in 5..=10 {
+                    imm[i] = arr[i + 20]
+                }
+                imm[11] = arr[7];
+                imm[12] = arr[31];
+
+                let mut sum = 0;
+                for i in 0..32 {
+                    sum <<= 1;
+                    sum += imm[31 - i];
+                }
+                sum as i32
+            },
         }
     }
 }
 
 //upper immediate
+#[derive(Debug)]
 pub struct UType {
     opcode: u32,
     rd: u32,
@@ -118,51 +165,56 @@ impl UType {
     fn from(byte_code: u32) -> Self {
         Self {
             opcode: byte_code & 127,
-            rd: (byte_code & 3968) >> 6,
-            imm: (byte_code & 4294963200) >> 12,
+            rd: (byte_code & 3968) >> 7,
+            imm: (byte_code & 4294963200),
         }
     }
 }
 
 //jump
+#[derive(Debug)]
 pub struct JType {
     opcode: u32,
     rd: u32,
-    imm: u32,
+    imm: i32,
 }
 
 impl JType {
     fn from(byte_code: u32) -> Self {
         Self {
             opcode: byte_code & 127,
-            rd: (byte_code & 3968) >> 6,
+            rd: (byte_code & 3968) >> 7,
             imm: {
                 let mut arr = [0; 32];
                 let mut imm = [0; 32];
-                for i in 0..31 {
-                    arr[i] = byte_code & (1 << i);
+                for i in 0..32 {
+                    arr[i] = (byte_code & (1 << i)) >> i;
                 }
 
                 imm[20] = arr[31];
-                for i in 19..12 {
-                    imm[i] = arr[i];
+                for i in 21..=30 {
+                    imm[i - 20] = arr[i];
                 }
                 imm[11] = arr[20];
-                for i in 10..1 {
-                    imm[i] = arr[i + 20]
+                for i in 12..=19 {
+                    imm[i] = arr[i];
+                }
+                for i in 21..=31 {
+                    imm[i] = imm[20];
                 }
 
                 let mut sum = 0;
-                for i in 0..31 {
+                for i in 0..32 {
                     sum <<= 1;
-                    sum += imm[i];
+                    sum += imm[31 - i];
                 }
-                sum
+                sum as i32
             },
         }
     }
 }
 
+#[derive(Debug)]
 pub enum Instruction {
     R(RType),
     I(IType),
