@@ -222,7 +222,6 @@ pub enum Instruction {
     B(BType),
     U(UType),
     J(JType),
-    NoInstr,
 }
 
 impl Instruction {
