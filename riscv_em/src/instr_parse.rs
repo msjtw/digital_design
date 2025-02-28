@@ -1,12 +1,14 @@
+use std::{error::Error, fmt};
+
 //register
 #[derive(Debug)]
 pub struct RType {
-    opcode: u32,
-    rd: u32,
-    rs1: u32,
-    rs2: u32,
-    funct3: u32,
-    funct7: u32,
+    pub opcode: u32,
+    pub rd: u32,
+    pub rs1: u32,
+    pub rs2: u32,
+    pub funct3: u32,
+    pub funct7: u32,
 }
 
 impl RType {
@@ -25,11 +27,11 @@ impl RType {
 //immediate
 #[derive(Debug)]
 pub struct IType {
-    opcode: u32,
-    rd: u32,
-    rs1: u32,
-    funct3: u32,
-    imm: i32,
+    pub opcode: u32,
+    pub rd: u32,
+    pub rs1: u32,
+    pub funct3: u32,
+    pub imm: i32,
 }
 
 impl IType {
@@ -67,11 +69,11 @@ impl IType {
 //strore
 #[derive(Debug)]
 pub struct SType {
-    opcode: u32,
-    rs1: u32,
-    rs2: u32,
-    funct3: u32,
-    imm: i32,
+    pub opcode: u32,
+    pub rs1: u32,
+    pub rs2: u32,
+    pub funct3: u32,
+    pub imm: i32,
 }
 
 impl SType {
@@ -112,11 +114,11 @@ impl SType {
 //branch
 #[derive(Debug)]
 pub struct BType {
-    opcode: u32,
-    rs1: u32,
-    rs2: u32,
-    funct3: u32,
-    imm: i32,
+    pub opcode: u32,
+    pub rs1: u32,
+    pub rs2: u32,
+    pub funct3: u32,
+    pub imm: i32,
 }
 
 impl BType {
@@ -156,9 +158,9 @@ impl BType {
 //upper immediate
 #[derive(Debug)]
 pub struct UType {
-    opcode: u32,
-    rd: u32,
-    imm: u32,
+    pub opcode: u32,
+    pub rd: u32,
+    pub imm: u32,
 }
 
 impl UType {
@@ -174,9 +176,9 @@ impl UType {
 //jump
 #[derive(Debug)]
 pub struct JType {
-    opcode: u32,
-    rd: u32,
-    imm: i32,
+    pub opcode: u32,
+    pub rd: u32,
+    pub imm: i32,
 }
 
 impl JType {
@@ -215,6 +217,23 @@ impl JType {
 }
 
 #[derive(Debug)]
+pub enum InstructionError {
+    WrongOpcode,
+    ExecutionError,
+}
+
+impl Error for InstructionError {}
+
+impl fmt::Display for InstructionError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::WrongOpcode => write!(f, "Instruction opcode doesn't match any type!"),
+            Self::ExecutionError => write!(f, "Operation execution was impossible!"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum Instruction {
     R(RType),
     I(IType),
@@ -225,20 +244,20 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    pub fn from(byte_code: u32) -> Self {
+    pub fn from(byte_code: u32) -> Result<Self, InstructionError> {
         let opcode = byte_code & 127;
         match opcode {
-            0b0110011 => Instruction::R(RType::from(byte_code)),
-            0b0010011 => Instruction::I(IType::from(byte_code)),
-            0b0000011 => Instruction::I(IType::from(byte_code)),
-            0b0100011 => Instruction::S(SType::from(byte_code)),
-            0b1100011 => Instruction::B(BType::from(byte_code)),
-            0b1101111 => Instruction::J(JType::from(byte_code)),
-            0b1100111 => Instruction::I(IType::from(byte_code)),
-            0b0110111 => Instruction::U(UType::from(byte_code)),
-            0b0010111 => Instruction::U(UType::from(byte_code)),
-            0b1110011 => Instruction::I(IType::from(byte_code)),
-            _ => Instruction::NoInstr,
+            0b0110011 => Ok(Instruction::R(RType::from(byte_code))),
+            0b0010011 => Ok(Instruction::I(IType::from(byte_code))),
+            0b0000011 => Ok(Instruction::I(IType::from(byte_code))),
+            0b0100011 => Ok(Instruction::S(SType::from(byte_code))),
+            0b1100011 => Ok(Instruction::B(BType::from(byte_code))),
+            0b1101111 => Ok(Instruction::J(JType::from(byte_code))),
+            0b1100111 => Ok(Instruction::I(IType::from(byte_code))),
+            0b0110111 => Ok(Instruction::U(UType::from(byte_code))),
+            0b0010111 => Ok(Instruction::U(UType::from(byte_code))),
+            0b1110011 => Ok(Instruction::I(IType::from(byte_code))),
+            _ => Err(InstructionError::WrongOpcode),
         }
     }
 }

@@ -5,8 +5,8 @@ use std::fs;
 
 pub struct ElfData {
     pub intructions: Vec<u32>,
-    pub base_address: u64,
-    pub entry_adress: u64,
+    pub base_address: u32,
+    pub entry_adress: u32,
 }
 
 pub fn read_efl(path: &str) -> Result<ElfData, Box<dyn Error>> {
@@ -37,7 +37,7 @@ pub fn read_efl(path: &str) -> Result<ElfData, Box<dyn Error>> {
 
     Ok(ElfData {
         intructions: assembly,
-        base_address: text_data.address(),
-        entry_adress: file_data.entry(),
+        base_address: text_data.address() as u32,
+        entry_adress: file_data.entry() as u32,
     })
 }
