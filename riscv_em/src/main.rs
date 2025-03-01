@@ -14,10 +14,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let content = elf_parse::read_efl(&args[1])?;
-    println!("address {:x}", content.base_address);
-    println!("entry {:x}", content.entry_adress);
+    let mut proc = exec_unit::Processor::read_data(&content);
     for a in content.intructions {
         println!("{:8x}    {:?}", a, Instruction::from(a)?);
+        proc.exec();
     }
     Ok(())
 }

@@ -31,6 +31,7 @@ pub struct IType {
     pub rd: u32,
     pub rs1: u32,
     pub funct3: u32,
+    pub funct7: u32,
     pub imm: i32,
 }
 
@@ -41,6 +42,7 @@ impl IType {
             rd: (byte_code & 3968) >> 7,
             rs1: (byte_code & 1015808) >> 15,
             funct3: (byte_code & 28672) >> 12,
+            funct7: (byte_code & 4261412864) >> 25,
             imm: {
                 let mut arr = [0; 32];
                 let mut imm = [0; 32];
@@ -160,7 +162,7 @@ impl BType {
 pub struct UType {
     pub opcode: u32,
     pub rd: u32,
-    pub imm: u32,
+    pub imm: i32,
 }
 
 impl UType {
@@ -168,7 +170,7 @@ impl UType {
         Self {
             opcode: byte_code & 127,
             rd: (byte_code & 3968) >> 7,
-            imm: (byte_code & 4294963200),
+            imm: (byte_code & 4294963200) as i32,
         }
     }
 }
@@ -220,6 +222,7 @@ impl JType {
 pub enum InstructionError {
     WrongOpcode,
     ExecutionError,
+    NotSupported,
 }
 
 impl Error for InstructionError {}
@@ -229,6 +232,7 @@ impl fmt::Display for InstructionError {
         match self {
             Self::WrongOpcode => write!(f, "Instruction opcode doesn't match any type!"),
             Self::ExecutionError => write!(f, "Operation execution was impossible!"),
+            Self::NotSupported => write!(f, "Operation not supported!"),
         }
     }
 }
