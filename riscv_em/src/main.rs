@@ -1,10 +1,9 @@
 use std::env;
 use std::error::Error;
 use std::process;
-mod elf_parse;
 mod exec_unit;
 mod instr_parse;
-use crate::instr_parse::Instruction;
+use std::fs;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -13,11 +12,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    let content = elf_parse::read_efl(&args[1])?;
-    let mut proc = exec_unit::Processor::read_data(&content);
-    for a in content.intructions {
-        println!("{:8x}    {:?}", a, Instruction::from(a)?);
-        proc.exec();
-    }
+    let data = fs::read(&args[1])?;
+    let file = object::File::parse(&*data)?;
+
+    let mut proc = exec_unit::Processor::read_data(&file)?;
+    while let Ok(()) = proc.exec() {}
     Ok(())
 }

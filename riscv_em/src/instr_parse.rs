@@ -146,6 +146,10 @@ impl BType {
                 imm[11] = arr[7];
                 imm[12] = arr[31];
 
+                for i in 13..=31 {
+                    imm[i] = imm[12];
+                }
+
                 let mut sum = 0;
                 for i in 0..32 {
                     sum <<= 1;
@@ -195,14 +199,15 @@ impl JType {
                     arr[i] = (byte_code & (1 << i)) >> i;
                 }
 
-                imm[20] = arr[31];
-                for i in 21..=30 {
-                    imm[i - 20] = arr[i];
+                for i in 1..=10 {
+                    imm[i] = arr[i + 20];
                 }
                 imm[11] = arr[20];
                 for i in 12..=19 {
                     imm[i] = arr[i];
                 }
+                imm[20] = arr[31];
+
                 for i in 21..=31 {
                     imm[i] = imm[20];
                 }
