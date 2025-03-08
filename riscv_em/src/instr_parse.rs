@@ -174,7 +174,7 @@ impl UType {
         Self {
             opcode: byte_code & 127,
             rd: (byte_code & 3968) >> 7,
-            imm: (byte_code & 4294963200) as i32,
+            imm: ((byte_code & 4294963200) >> 12) as i32,
         }
     }
 }
@@ -228,6 +228,7 @@ pub enum InstructionError {
     WrongOpcode,
     ExecutionError,
     NotSupported,
+    End,
 }
 
 impl Error for InstructionError {}
@@ -238,6 +239,7 @@ impl fmt::Display for InstructionError {
             Self::WrongOpcode => write!(f, "Instruction opcode doesn't match any type!"),
             Self::ExecutionError => write!(f, "Operation execution was impossible!"),
             Self::NotSupported => write!(f, "Operation not supported!"),
+            Self::End => write!(f, "End of execution!"),
         }
     }
 }
