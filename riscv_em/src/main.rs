@@ -17,9 +17,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let file = object::File::parse(&*data)?;
 
     let mut proc = exec_unit::Processor::read_data(&file)?;
-    while let Ok(()) = proc.exec() {
+    loop {
         let mut guess = String::new();
 
+        match proc.exec() {
+            Ok(_) => {}
+            Err(x) => {
+                println!("{:?}", x);
+                break;
+            }
+        }
         // io::stdin()
         //     .read_line(&mut guess)
         //     .expect("Failed to read line");

@@ -1,9 +1,8 @@
 use object::{Object, ObjectSegment};
-use std::collections::HashMap;
-use std::default;
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, u32};
 
 use crate::instr_parse::{BType, IType, Instruction, InstructionError, JType, RType, SType, UType};
+mod memory;
 
 #[derive(Debug)]
 pub enum ElfError {
@@ -28,69 +27,10 @@ impl fmt::Display for ElfError {
     }
 }
 
-struct Memory {
-    data: HashMap<u32, u8>,
-}
-
-impl Default for Memory {
-    fn default() -> Self {
-        Memory {
-            data: HashMap::new(),
-        }
-    }
-}
-
-impl Memory {
-    fn get_word(&self, mut address: u32) -> u32 {
-        let d: u32 = self.data.get(&address).copied().unwrap_or(0).into();
-        address += 1;
-        let c: u32 = self.data.get(&address).copied().unwrap_or(0).into();
-        address += 1;
-        let b: u32 = self.data.get(&address).copied().unwrap_or(0).into();
-        address += 1;
-        let a: u32 = self.data.get(&address).copied().unwrap_or(0).into();
-        (a << 24) + (b << 16) + (c << 8) + d
-    }
-    fn get_hword(&self, mut address: u32) -> u16 {
-        let b: u16 = self.data.get(&address).copied().unwrap_or(0).into();
-        address += 1;
-        let a: u16 = self.data.get(&address).copied().unwrap_or(0).into();
-        (a << 8) + b
-    }
-    fn get_byte(&self, address: u32) -> u8 {
-        self.data.get(&address).copied().unwrap_or(0)
-    }
-    fn insert_word(&mut self, address: u32, data: u32) {
-        let mut mask: u32 = (2 << 8) - 1;
-        let d: u8 = (data & mask).try_into().unwrap();
-        mask <<= 8;
-        let c: u8 = ((data & mask) >> 8).try_into().unwrap();
-        mask <<= 8;
-        let b: u8 = ((data & mask) >> 16).try_into().unwrap();
-        mask <<= 8;
-        let a: u8 = ((data & mask) >> 24).try_into().unwrap();
-        self.data.insert(address, d);
-        self.data.insert(address + 1, c);
-        self.data.insert(address + 2, b);
-        self.data.insert(address + 3, a);
-    }
-    fn insert_hword(&mut self, address: u32, data: u16) {
-        let mut mask: u16 = (2 << 8) - 1;
-        let d: u8 = (data & mask).try_into().unwrap();
-        mask <<= 8;
-        let c: u8 = ((data & mask) >> 8).try_into().unwrap();
-        self.data.insert(address, d);
-        self.data.insert(address + 1, c);
-    }
-    fn insert_byte(&mut self, address: u32, data: u8) {
-        self.data.insert(address, data);
-    }
-}
-
 pub struct Processor {
     pc: u32,
     reg_file: [i32; 32],
-    memory: Memory,
+    memory: memory::Memory,
 }
 
 impl Default for Processor {
@@ -98,9 +38,7 @@ impl Default for Processor {
         Processor {
             pc: 0,
             reg_file: [0; 32],
-            memory: Memory {
-                ..Default::default()
-            },
+            memory: memory::Memory::new(),
         }
     }
 }
@@ -115,13 +53,14 @@ impl Processor {
             ..Default::default()
         };
         for segment in elf.segments() {
-            let addr = segment.address();
-            for i in 0..segment.size() {
+            println!("{:?}", segment.data()?.iter().len());
+            let addr = segment.address() as u32;
+            for i in 0..segment.data()?.iter().len() {
                 proc.memory
-                    .insert_byte((addr + i).try_into().unwrap(), segment.data()?[i as usize]);
+                    .insert_byte(addr + i as u32, segment.data()?[i as usize]);
             }
         }
-        proc.reg_file[2] = 100;
+        proc.reg_file[2] = i32::MAX;
         Ok(proc)
     }
 

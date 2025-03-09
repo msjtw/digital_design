@@ -2,4 +2,5 @@ bin/
 obj_dir/
 assembly/
 vcd_dump/
+elf_test/
 riscv_em/target

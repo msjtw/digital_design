@@ -2,6 +2,7 @@ use std::{error::Error, fmt};
 
 //register
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct RType {
     pub opcode: u32,
     pub rd: u32,
@@ -26,6 +27,7 @@ impl RType {
 
 //immediate
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct IType {
     pub opcode: u32,
     pub rd: u32,
@@ -70,6 +72,7 @@ impl IType {
 
 //strore
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct SType {
     pub opcode: u32,
     pub rs1: u32,
@@ -115,6 +118,7 @@ impl SType {
 
 //branch
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct BType {
     pub opcode: u32,
     pub rs1: u32,
@@ -163,6 +167,7 @@ impl BType {
 
 //upper immediate
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct UType {
     pub opcode: u32,
     pub rd: u32,
@@ -181,6 +186,7 @@ impl UType {
 
 //jump
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct JType {
     pub opcode: u32,
     pub rd: u32,
