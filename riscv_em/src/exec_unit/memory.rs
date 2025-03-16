@@ -39,7 +39,7 @@ impl Memory {
         self.data.get(&address).copied().unwrap_or(0)
     }
     pub fn insert_word(&mut self, address: u32, data: u32) {
-        let mut mask: u32 = (2 << 8) - 1;
+        let mut mask: u32 = (1 << 8) - 1;
         let d: u8 = (data & mask).try_into().unwrap();
         mask <<= 8;
         let c: u8 = ((data & mask) >> 8).try_into().unwrap();

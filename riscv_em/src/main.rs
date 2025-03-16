@@ -19,7 +19,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut proc = exec_unit::Processor::read_data(&file)?;
     loop {
         let mut guess = String::new();
-
         match proc.exec() {
             Ok(_) => {}
             Err(x) => {

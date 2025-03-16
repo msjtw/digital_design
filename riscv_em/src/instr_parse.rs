@@ -274,7 +274,11 @@ impl Instruction {
             0b0110111 => Ok(Instruction::U(UType::from(byte_code))),
             0b0010111 => Ok(Instruction::U(UType::from(byte_code))),
             0b1110011 => Ok(Instruction::I(IType::from(byte_code))),
-            _ => Err(InstructionError::WrongOpcode),
+            _ => {
+                println!("{opcode:b}");
+                println!("{byte_code:b}");
+                Err(InstructionError::WrongOpcode)
+            }
         }
     }
 }

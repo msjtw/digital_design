@@ -60,7 +60,7 @@ impl Processor {
                     .insert_byte(addr + i as u32, segment.data()?[i as usize]);
             }
         }
-        proc.reg_file[2] = i32::MAX;
+        proc.reg_file[2] = i32::MAX / 2;
         Ok(proc)
     }
 
@@ -73,15 +73,20 @@ impl Processor {
             "  zero    ra    sp    gp    tp    t0    t1    t2    s0    s1    a0    a1    a2    a3    a4    a5    a6    a7    s2    s3    s4    s5    s6    s7    s8    s9   s10   s11    t3    t4    t5    t6"
         );
         for i in 0..32 {
-            print!("{:6}", self.reg_file[i]);
+            if self.reg_file[i].to_string().len() > 5 {
+                print!("    --");
+            } else {
+                print!("{:6}", self.reg_file[i]);
+            }
         }
         println!("");
     }
 
     pub fn exec(&mut self) -> Result<(), InstructionError> {
         let byte_code = self.memory.get_word(self.pc);
+        print!("{:5x?};", self.pc);
         let instr = Instruction::from(byte_code)?;
-        println!("{:?} {:?}", self.pc, instr);
+        println!(" {:?}", instr);
         match instr {
             Instruction::R(x) => self.exec_r(&x),
             Instruction::I(x) => self.exec_i(&x),
@@ -272,7 +277,7 @@ impl Processor {
             //jalr
             0b1100111 => {
                 self.reg_file[instr.rd as usize] = (self.pc + 4) as i32;
-                self.pc = (instr.rs1 as i32 + instr.imm) as u32;
+                self.pc = (self.reg_file[instr.rs1 as usize] as i32 + instr.imm) as u32;
             }
             //ecall and ebreak
             0b1110011 => return Err(InstructionError::NotSupported),
@@ -375,7 +380,7 @@ impl Processor {
             //jal
             0b1101111 => {
                 self.reg_file[instr.rd as usize] = (self.pc + 4) as i32;
-                self.pc = (self.pc as i32 + instr.imm - 4) as u32;
+                self.pc = (self.pc as i32 + instr.imm) as u32;
             }
             _ => return Err(InstructionError::ExecutionError),
         };
