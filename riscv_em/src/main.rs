@@ -22,7 +22,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         match proc.exec() {
             Ok(_) => {}
             Err(x) => {
-                println!("{:?}", x);
+                match x {
+                    instr_parse::InstructionError::End => (),
+                    _ => println!("{:?}", x),
+                }
                 break;
             }
         }

@@ -3,6 +3,7 @@ use std::{error::Error, fmt, u32};
 
 use crate::instr_parse::{BType, IType, Instruction, InstructionError, JType, RType, SType, UType};
 mod memory;
+mod syscalls;
 
 #[derive(Debug)]
 pub enum ElfError {
@@ -53,7 +54,6 @@ impl Processor {
             ..Default::default()
         };
         for segment in elf.segments() {
-            println!("{:?}", segment.data()?.iter().len());
             let addr = segment.address() as u32;
             for i in 0..segment.data()?.iter().len() {
                 proc.memory
@@ -84,9 +84,9 @@ impl Processor {
 
     pub fn exec(&mut self) -> Result<(), InstructionError> {
         let byte_code = self.memory.get_word(self.pc);
-        print!("{:5x?};", self.pc);
+        // print!("{:5x?};", self.pc);
         let instr = Instruction::from(byte_code)?;
-        println!(" {:?}", instr);
+        // println!(" {:?}", instr);
         match instr {
             Instruction::R(x) => self.exec_r(&x),
             Instruction::I(x) => self.exec_i(&x),
@@ -96,7 +96,7 @@ impl Processor {
             Instruction::J(x) => self.exec_j(&x),
         }?;
         self.reg_file[0] = 0;
-        self.print_reg_file();
+        // self.print_reg_file();
 
         if self.pc == 0 {
             Err(InstructionError::End)
@@ -118,33 +118,81 @@ impl Processor {
                     self.reg_file[instr.rd as usize] =
                         self.reg_file[instr.rs1 as usize] - self.reg_file[instr.rs2 as usize];
                 }
+                //mul
+                0x01 => {
+                    let a: i64 = self.reg_file[instr.rs1 as usize].into();
+                    let b: i64 = self.reg_file[instr.rs2 as usize].into();
+                    let tmp = a * b;
+                    self.reg_file[instr.rd as usize] = tmp as i32;
+                }
                 _ => return Err(InstructionError::ExecutionError),
             },
-            //xor
-            0x4 => {
-                self.reg_file[instr.rd as usize] =
-                    self.reg_file[instr.rs1 as usize] ^ self.reg_file[instr.rs2 as usize];
-            }
-            //or
-            0x6 => {
-                self.reg_file[instr.rd as usize] =
-                    self.reg_file[instr.rs1 as usize] | self.reg_file[instr.rs2 as usize];
-            }
-            //and
-            0x7 => {
-                self.reg_file[instr.rd as usize] =
-                    self.reg_file[instr.rs1 as usize] & self.reg_file[instr.rs2 as usize];
-            }
-            //sll
-            0x1 => {
-                self.reg_file[instr.rd as usize] =
-                    self.reg_file[instr.rs1 as usize] << self.reg_file[instr.rs2 as usize];
-            }
+            0x4 => match instr.funct7 {
+                //xor
+                0x00 => {
+                    self.reg_file[instr.rd as usize] =
+                        self.reg_file[instr.rs1 as usize] ^ self.reg_file[instr.rs2 as usize];
+                }
+                //div
+                0x01 => {
+                    self.reg_file[instr.rd as usize] =
+                        self.reg_file[instr.rs1 as usize] / self.reg_file[instr.rs2 as usize];
+                }
+                _ => return Err(InstructionError::ExecutionError),
+            },
+            0x6 => match instr.funct7 {
+                //or
+                0x00 => {
+                    self.reg_file[instr.rd as usize] =
+                        self.reg_file[instr.rs1 as usize] | self.reg_file[instr.rs2 as usize];
+                }
+                //rem
+                0x01 => {
+                    self.reg_file[instr.rd as usize] =
+                        self.reg_file[instr.rs1 as usize] % self.reg_file[instr.rs2 as usize];
+                }
+                _ => return Err(InstructionError::ExecutionError),
+            },
+            0x7 => match instr.funct7 {
+                //and
+                0x00 => {
+                    self.reg_file[instr.rd as usize] =
+                        self.reg_file[instr.rs1 as usize] & self.reg_file[instr.rs2 as usize];
+                }
+                //remu
+                0x01 => {
+                    self.reg_file[instr.rd as usize] = (self.reg_file[instr.rs1 as usize] as u32
+                        % self.reg_file[instr.rs2 as usize] as u32)
+                        as i32;
+                }
+                _ => return Err(InstructionError::ExecutionError),
+            },
+            0x1 => match instr.funct7 {
+                //sll
+                0x00 => {
+                    self.reg_file[instr.rd as usize] =
+                        self.reg_file[instr.rs1 as usize] << self.reg_file[instr.rs2 as usize];
+                }
+                //mulh
+                0x01 => {
+                    let a: i64 = self.reg_file[instr.rs1 as usize].into();
+                    let b: i64 = self.reg_file[instr.rs2 as usize].into();
+                    let tmp = (a * b) >> 32;
+                    self.reg_file[instr.rd as usize] = tmp as i32;
+                }
+                _ => return Err(InstructionError::ExecutionError),
+            },
             0x5 => match instr.funct7 {
                 //srl
                 0x00 => {
                     self.reg_file[instr.rd as usize] = (self.reg_file[instr.rs1 as usize] as u32
                         >> self.reg_file[instr.rs2 as usize])
+                        as i32;
+                }
+                //divu
+                0x01 => {
+                    self.reg_file[instr.rd as usize] = (self.reg_file[instr.rs1 as usize] as u32
+                        / self.reg_file[instr.rs2 as usize] as u32)
                         as i32;
                 }
                 //sra
@@ -154,25 +202,45 @@ impl Processor {
                 }
                 _ => return Err(InstructionError::ExecutionError),
             },
-            //slt
-            0x2 => {
-                self.reg_file[instr.rd as usize] =
-                    if self.reg_file[instr.rs1 as usize] < self.reg_file[instr.rs2 as usize] {
+            0x2 => match instr.funct7 {
+                //slt
+                0x00 => {
+                    self.reg_file[instr.rd as usize] =
+                        if self.reg_file[instr.rs1 as usize] < self.reg_file[instr.rs2 as usize] {
+                            1
+                        } else {
+                            0
+                        };
+                }
+                //mulsu
+                0x01 => {
+                    let a: i64 = self.reg_file[instr.rs1 as usize].into();
+                    let b: i64 = self.reg_file[instr.rs2 as usize] as i64;
+                    let tmp = (a * b) >> 32;
+                    self.reg_file[instr.rd as usize] = tmp as i32;
+                }
+                _ => return Err(InstructionError::ExecutionError),
+            },
+            0x3 => match instr.funct7 {
+                //sltu
+                0x00 => {
+                    self.reg_file[instr.rd as usize] = if (self.reg_file[instr.rs1 as usize] as u32)
+                        < (self.reg_file[instr.rs2 as usize] as u32)
+                    {
                         1
                     } else {
                         0
                     };
-            }
-            //sltu
-            0x3 => {
-                self.reg_file[instr.rd as usize] = if (self.reg_file[instr.rs1 as usize] as u32)
-                    < (self.reg_file[instr.rs2 as usize] as u32)
-                {
-                    1
-                } else {
-                    0
-                };
-            }
+                }
+                //mulu
+                0x01 => {
+                    let a: i64 = self.reg_file[instr.rs1 as usize] as i64;
+                    let b: i64 = self.reg_file[instr.rs2 as usize] as i64;
+                    let tmp = (a * b) >> 32;
+                    self.reg_file[instr.rd as usize] = tmp as i32;
+                }
+                _ => return Err(InstructionError::ExecutionError),
+            },
 
             _ => return Err(InstructionError::ExecutionError),
         };
@@ -280,7 +348,16 @@ impl Processor {
                 self.pc = (self.reg_file[instr.rs1 as usize] as i32 + instr.imm) as u32;
             }
             //ecall and ebreak
-            0b1110011 => return Err(InstructionError::NotSupported),
+            0b1110011 => match instr.funct7 {
+                //ecall
+                0x0 => {
+                    let syscall = syscalls::SystemCall::from(self);
+                    syscall.exec(self)?;
+                    self.pc += 4;
+                }
+                // ebreak
+                _ => return Err(InstructionError::NotSupported),
+            },
             _ => return Err(InstructionError::ExecutionError),
         };
         Ok(())
