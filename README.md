@@ -10,9 +10,9 @@ My solutions for exercises from the 4th chapter of the Digital Design and Comput
 Implementation in System Verilog of simple RISC-V core based on schematics from Digital Design and Computer Architecture book.
 
 ## riscv_em
-RISC-V (RV32I) core emulator written in rust. It's capable of execution of simple stand-alone ELF binaries.
+RISC-V (RV32IM) core emulator written in rust. It's capable of execution of simple stand-alone ELF binaries.
 
 ```bash
-riscv32-unknown-elf-gcc -nostdlib -o main main.c
+riscv32-unknown-elf-gcc -o main main.c
 ./riscv_em main
 ```
