@@ -31,7 +31,11 @@ impl fmt::Display for ElfError {
 pub struct Processor {
     pc: u32,
     reg_file: [i32; 32],
+    csr: [u32; 4096],
     memory: memory::Memory,
+
+    lr_address: u32,
+    lr_valid: bool,
 }
 
 impl Default for Processor {
@@ -39,7 +43,11 @@ impl Default for Processor {
         Processor {
             pc: 0,
             reg_file: [0; 32],
+            csr: [0; 4096],
             memory: memory::Memory::new(),
+
+            lr_address: 0,
+            lr_valid: false,
         }
     }
 }
@@ -60,7 +68,7 @@ impl Processor {
                     .insert_byte(addr + i as u32, segment.data()?[i as usize]);
             }
         }
-        proc.reg_file[2] = i32::MAX / 2;
+        proc.reg_file[2] = 0xBFFFFFF0u32 as i32;
         Ok(proc)
     }
 
@@ -106,145 +114,303 @@ impl Processor {
     }
 
     fn exec_r(&mut self, instr: &RType) -> Result<(), InstructionError> {
-        match instr.funct3 {
-            0x0 => match instr.funct7 {
-                //add
-                0x00 => {
-                    self.reg_file[instr.rd as usize] =
-                        self.reg_file[instr.rs1 as usize] + self.reg_file[instr.rs2 as usize];
-                }
-                //sub
-                0x20 => {
-                    self.reg_file[instr.rd as usize] =
-                        self.reg_file[instr.rs1 as usize] - self.reg_file[instr.rs2 as usize];
-                }
-                //mul
-                0x01 => {
-                    let a: i64 = self.reg_file[instr.rs1 as usize].into();
-                    let b: i64 = self.reg_file[instr.rs2 as usize].into();
-                    let tmp = a * b;
-                    self.reg_file[instr.rd as usize] = tmp as i32;
-                }
-                _ => return Err(InstructionError::ExecutionError),
-            },
-            0x4 => match instr.funct7 {
-                //xor
-                0x00 => {
-                    self.reg_file[instr.rd as usize] =
-                        self.reg_file[instr.rs1 as usize] ^ self.reg_file[instr.rs2 as usize];
-                }
-                //div
-                0x01 => {
-                    self.reg_file[instr.rd as usize] =
-                        self.reg_file[instr.rs1 as usize] / self.reg_file[instr.rs2 as usize];
-                }
-                _ => return Err(InstructionError::ExecutionError),
-            },
-            0x6 => match instr.funct7 {
-                //or
-                0x00 => {
-                    self.reg_file[instr.rd as usize] =
-                        self.reg_file[instr.rs1 as usize] | self.reg_file[instr.rs2 as usize];
-                }
-                //rem
-                0x01 => {
-                    self.reg_file[instr.rd as usize] =
-                        self.reg_file[instr.rs1 as usize] % self.reg_file[instr.rs2 as usize];
-                }
-                _ => return Err(InstructionError::ExecutionError),
-            },
-            0x7 => match instr.funct7 {
-                //and
-                0x00 => {
-                    self.reg_file[instr.rd as usize] =
-                        self.reg_file[instr.rs1 as usize] & self.reg_file[instr.rs2 as usize];
-                }
-                //remu
-                0x01 => {
-                    self.reg_file[instr.rd as usize] = (self.reg_file[instr.rs1 as usize] as u32
-                        % self.reg_file[instr.rs2 as usize] as u32)
-                        as i32;
-                }
-                _ => return Err(InstructionError::ExecutionError),
-            },
-            0x1 => match instr.funct7 {
-                //sll
-                0x00 => {
-                    self.reg_file[instr.rd as usize] =
-                        self.reg_file[instr.rs1 as usize] << self.reg_file[instr.rs2 as usize];
-                }
-                //mulh
-                0x01 => {
-                    let a: i64 = self.reg_file[instr.rs1 as usize].into();
-                    let b: i64 = self.reg_file[instr.rs2 as usize].into();
-                    let tmp = (a * b) >> 32;
-                    self.reg_file[instr.rd as usize] = tmp as i32;
-                }
-                _ => return Err(InstructionError::ExecutionError),
-            },
-            0x5 => match instr.funct7 {
-                //srl
-                0x00 => {
-                    self.reg_file[instr.rd as usize] = (self.reg_file[instr.rs1 as usize] as u32
-                        >> self.reg_file[instr.rs2 as usize])
-                        as i32;
-                }
-                //divu
-                0x01 => {
-                    self.reg_file[instr.rd as usize] = (self.reg_file[instr.rs1 as usize] as u32
-                        / self.reg_file[instr.rs2 as usize] as u32)
-                        as i32;
-                }
-                //sra
-                0x02 => {
-                    self.reg_file[instr.rd as usize] =
-                        self.reg_file[instr.rs1 as usize] >> self.reg_file[instr.rs2 as usize];
-                }
-                _ => return Err(InstructionError::ExecutionError),
-            },
-            0x2 => match instr.funct7 {
-                //slt
-                0x00 => {
-                    self.reg_file[instr.rd as usize] =
-                        if self.reg_file[instr.rs1 as usize] < self.reg_file[instr.rs2 as usize] {
-                            1
-                        } else {
-                            0
-                        };
-                }
-                //mulsu
-                0x01 => {
-                    let a: i64 = self.reg_file[instr.rs1 as usize].into();
-                    let b: i64 = self.reg_file[instr.rs2 as usize] as i64;
-                    let tmp = (a * b) >> 32;
-                    self.reg_file[instr.rd as usize] = tmp as i32;
-                }
-                _ => return Err(InstructionError::ExecutionError),
-            },
-            0x3 => match instr.funct7 {
-                //sltu
-                0x00 => {
-                    self.reg_file[instr.rd as usize] = if (self.reg_file[instr.rs1 as usize] as u32)
-                        < (self.reg_file[instr.rs2 as usize] as u32)
-                    {
-                        1
-                    } else {
-                        0
-                    };
-                }
-                //mulu
-                0x01 => {
-                    let a: i64 = self.reg_file[instr.rs1 as usize] as i64;
-                    let b: i64 = self.reg_file[instr.rs2 as usize] as i64;
-                    let tmp = (a * b) >> 32;
-                    self.reg_file[instr.rd as usize] = tmp as i32;
-                }
-                _ => return Err(InstructionError::ExecutionError),
-            },
+        match instr.opcode {
+            0b0110011 => {
+                match instr.funct3 {
+                    0x0 => match instr.funct7 {
+                        //add
+                        0x00 => {
+                            self.reg_file[instr.rd as usize] = self.reg_file[instr.rs1 as usize]
+                                + self.reg_file[instr.rs2 as usize];
+                        }
+                        //sub
+                        0x20 => {
+                            self.reg_file[instr.rd as usize] = self.reg_file[instr.rs1 as usize]
+                                - self.reg_file[instr.rs2 as usize];
+                        }
+                        //mul
+                        0x01 => {
+                            let a: i64 = self.reg_file[instr.rs1 as usize].into();
+                            let b: i64 = self.reg_file[instr.rs2 as usize].into();
+                            let tmp = a * b;
+                            self.reg_file[instr.rd as usize] = tmp as i32;
+                        }
+                        _ => return Err(InstructionError::ExecutionError),
+                    },
+                    0x4 => match instr.funct7 {
+                        //xor
+                        0x00 => {
+                            self.reg_file[instr.rd as usize] = self.reg_file[instr.rs1 as usize]
+                                ^ self.reg_file[instr.rs2 as usize];
+                        }
+                        //div
+                        0x01 => {
+                            self.reg_file[instr.rd as usize] = self.reg_file[instr.rs1 as usize]
+                                / self.reg_file[instr.rs2 as usize];
+                        }
+                        _ => return Err(InstructionError::ExecutionError),
+                    },
+                    0x6 => match instr.funct7 {
+                        //or
+                        0x00 => {
+                            self.reg_file[instr.rd as usize] = self.reg_file[instr.rs1 as usize]
+                                | self.reg_file[instr.rs2 as usize];
+                        }
+                        //rem
+                        0x01 => {
+                            self.reg_file[instr.rd as usize] = self.reg_file[instr.rs1 as usize]
+                                % self.reg_file[instr.rs2 as usize];
+                        }
+                        _ => return Err(InstructionError::ExecutionError),
+                    },
+                    0x7 => match instr.funct7 {
+                        //and
+                        0x00 => {
+                            self.reg_file[instr.rd as usize] = self.reg_file[instr.rs1 as usize]
+                                & self.reg_file[instr.rs2 as usize];
+                        }
+                        //remu
+                        0x01 => {
+                            self.reg_file[instr.rd as usize] = (self.reg_file[instr.rs1 as usize]
+                                as u32
+                                % self.reg_file[instr.rs2 as usize] as u32)
+                                as i32;
+                        }
+                        _ => return Err(InstructionError::ExecutionError),
+                    },
+                    0x1 => match instr.funct7 {
+                        //sll
+                        0x00 => {
+                            self.reg_file[instr.rd as usize] = self.reg_file[instr.rs1 as usize]
+                                << self.reg_file[instr.rs2 as usize];
+                        }
+                        //mulh
+                        0x01 => {
+                            let a: i64 = self.reg_file[instr.rs1 as usize].into();
+                            let b: i64 = self.reg_file[instr.rs2 as usize].into();
+                            let tmp = (a * b) >> 32;
+                            self.reg_file[instr.rd as usize] = tmp as i32;
+                        }
+                        _ => return Err(InstructionError::ExecutionError),
+                    },
+                    0x5 => match instr.funct7 {
+                        //srl
+                        0x00 => {
+                            self.reg_file[instr.rd as usize] = (self.reg_file[instr.rs1 as usize]
+                                as u32
+                                >> self.reg_file[instr.rs2 as usize])
+                                as i32;
+                        }
+                        //divu
+                        0x01 => {
+                            self.reg_file[instr.rd as usize] = (self.reg_file[instr.rs1 as usize]
+                                as u32
+                                / self.reg_file[instr.rs2 as usize] as u32)
+                                as i32;
+                        }
+                        //sra
+                        0x02 => {
+                            self.reg_file[instr.rd as usize] = self.reg_file[instr.rs1 as usize]
+                                >> self.reg_file[instr.rs2 as usize];
+                        }
+                        _ => return Err(InstructionError::ExecutionError),
+                    },
+                    0x2 => match instr.funct7 {
+                        //slt
+                        0x00 => {
+                            self.reg_file[instr.rd as usize] = if self.reg_file[instr.rs1 as usize]
+                                < self.reg_file[instr.rs2 as usize]
+                            {
+                                1
+                            } else {
+                                0
+                            };
+                        }
+                        //mulsu
+                        0x01 => {
+                            let a: i64 = self.reg_file[instr.rs1 as usize].into();
+                            let b: i64 = self.reg_file[instr.rs2 as usize] as i64;
+                            let tmp = (a * b) >> 32;
+                            self.reg_file[instr.rd as usize] = tmp as i32;
+                        }
+                        _ => return Err(InstructionError::ExecutionError),
+                    },
+                    0x3 => match instr.funct7 {
+                        //sltu
+                        0x00 => {
+                            self.reg_file[instr.rd as usize] = if (self.reg_file[instr.rs1 as usize]
+                                as u32)
+                                < (self.reg_file[instr.rs2 as usize] as u32)
+                            {
+                                1
+                            } else {
+                                0
+                            };
+                        }
+                        //mulu
+                        0x01 => {
+                            let a: i64 = self.reg_file[instr.rs1 as usize] as i64;
+                            let b: i64 = self.reg_file[instr.rs2 as usize] as i64;
+                            let tmp = (a * b) >> 32;
+                            self.reg_file[instr.rd as usize] = tmp as i32;
+                        }
+                        _ => return Err(InstructionError::ExecutionError),
+                    },
 
+                    _ => return Err(InstructionError::ExecutionError),
+                };
+                self.pc += 4;
+            }
+            0b0101111 => match instr.funct5 {
+                // LR.W
+                0b00010 => {
+                    self.lr_address = self.reg_file[instr.rs1 as usize] as u32;
+                    self.lr_valid = true;
+                    self.reg_file[instr.rd as usize] = self
+                        .memory
+                        .get_word(self.reg_file[instr.rs1 as usize] as u32)
+                        as i32;
+                    self.pc += 4;
+                }
+                // SC.W
+                0b00011 => {
+                    if self.lr_valid
+                        && (self.lr_address == self.reg_file[instr.rs1 as usize] as u32)
+                    {
+                        self.memory.insert_word(
+                            self.reg_file[instr.rs1 as usize] as u32,
+                            self.reg_file[instr.rs2 as usize] as u32,
+                        );
+                        self.reg_file[instr.rd as usize] = 0;
+                    } else {
+                        self.reg_file[instr.rd as usize] = 1;
+                    }
+                    self.lr_address = 0;
+                    self.lr_valid = false;
+                    self.pc += 4;
+                }
+                // amoswap.w
+                0b00001 => {
+                    self.reg_file[instr.rd as usize] = self
+                        .memory
+                        .get_word(self.reg_file[instr.rs1 as usize] as u32)
+                        as i32;
+                    self.reg_file.swap(instr.rd as usize, instr.rs2 as usize);
+                    self.memory.insert_word(
+                        self.reg_file[instr.rs1 as usize] as u32,
+                        self.reg_file[instr.rd as usize] as u32,
+                    );
+                    self.pc += 4;
+                }
+                // amoadd.w
+                0b00000 => {
+                    self.reg_file[instr.rd as usize] = self
+                        .memory
+                        .get_word(self.reg_file[instr.rs1 as usize] as u32)
+                        as i32
+                        + self.reg_file[instr.rs2 as usize];
+                    self.memory.insert_word(
+                        self.reg_file[instr.rs1 as usize] as u32,
+                        self.reg_file[instr.rd as usize] as u32,
+                    );
+                    self.pc += 4;
+                }
+                // amoxor.w
+                0b00100 => {
+                    self.reg_file[instr.rd as usize] = self
+                        .memory
+                        .get_word(self.reg_file[instr.rs1 as usize] as u32)
+                        as i32
+                        ^ self.reg_file[instr.rs2 as usize];
+                    self.memory.insert_word(
+                        self.reg_file[instr.rs1 as usize] as u32,
+                        self.reg_file[instr.rd as usize] as u32,
+                    );
+                    self.pc += 4;
+                }
+                // amoand.w
+                0b01100 => {
+                    self.reg_file[instr.rd as usize] = self
+                        .memory
+                        .get_word(self.reg_file[instr.rs1 as usize] as u32)
+                        as i32
+                        & self.reg_file[instr.rs2 as usize];
+                    self.memory.insert_word(
+                        self.reg_file[instr.rs1 as usize] as u32,
+                        self.reg_file[instr.rd as usize] as u32,
+                    );
+                    self.pc += 4;
+                }
+                // amoor.w
+                0b01000 => {
+                    self.reg_file[instr.rd as usize] = self
+                        .memory
+                        .get_word(self.reg_file[instr.rs1 as usize] as u32)
+                        as i32
+                        | self.reg_file[instr.rs2 as usize];
+                    self.memory.insert_word(
+                        self.reg_file[instr.rs1 as usize] as u32,
+                        self.reg_file[instr.rd as usize] as u32,
+                    );
+                    self.pc += 4;
+                }
+                //amomin.w
+                0b10000 => {
+                    let tmp = self
+                        .memory
+                        .get_word(self.reg_file[instr.rd as usize] as u32)
+                        as i32;
+                    self.reg_file[instr.rd as usize] = tmp.min(self.reg_file[instr.rs2 as usize]);
+                    self.memory.insert_word(
+                        self.reg_file[instr.rs1 as usize] as u32,
+                        self.reg_file[instr.rd as usize] as u32,
+                    );
+                    self.pc += 4;
+                }
+                // amomax.w
+                0b10100 => {
+                    let tmp = self
+                        .memory
+                        .get_word(self.reg_file[instr.rd as usize] as u32)
+                        as i32;
+                    self.reg_file[instr.rd as usize] = tmp.max(self.reg_file[instr.rs2 as usize]);
+                    self.memory.insert_word(
+                        self.reg_file[instr.rs1 as usize] as u32,
+                        self.reg_file[instr.rd as usize] as u32,
+                    );
+                    self.pc += 4;
+                }
+                // amominu.w
+                0b11000 => {
+                    let tmp = self
+                        .memory
+                        .get_word(self.reg_file[instr.rd as usize] as u32);
+                    self.reg_file[instr.rd as usize] =
+                        tmp.min(self.reg_file[instr.rs2 as usize] as u32) as i32;
+                    self.memory.insert_word(
+                        self.reg_file[instr.rs1 as usize] as u32,
+                        self.reg_file[instr.rd as usize] as u32,
+                    );
+                    self.pc += 4;
+                }
+                // amomaxiu.w
+                0b11100 => {
+                    let tmp = self
+                        .memory
+                        .get_word(self.reg_file[instr.rd as usize] as u32);
+                    self.reg_file[instr.rd as usize] =
+                        tmp.max(self.reg_file[instr.rs2 as usize] as u32) as i32;
+                    self.memory.insert_word(
+                        self.reg_file[instr.rs1 as usize] as u32,
+                        self.reg_file[instr.rd as usize] as u32,
+                    );
+                    self.pc += 4;
+                }
+                _ => return Err(InstructionError::ExecutionError),
+            },
             _ => return Err(InstructionError::ExecutionError),
         };
-        self.pc += 4;
+
         Ok(())
     }
 
@@ -347,7 +513,6 @@ impl Processor {
                 self.reg_file[instr.rd as usize] = (self.pc + 4) as i32;
                 self.pc = (self.reg_file[instr.rs1 as usize] as i32 + instr.imm) as u32;
             }
-            //ecall and ebreak
             0b1110011 => match instr.funct7 {
                 //ecall
                 0x0 => {
@@ -355,9 +520,48 @@ impl Processor {
                     syscall.exec(self)?;
                     self.pc += 4;
                 }
+                // csrrw
+                0b001 => {
+                    self.reg_file[instr.rd as usize] = self.csr[instr.imm as usize] as i32;
+                    self.csr[instr.imm as usize] = self.reg_file[instr.rs1 as usize] as u32;
+                    self.pc += 4;
+                }
+                // csrrs
+                0b010 => {
+                    self.reg_file[instr.rd as usize] = self.csr[instr.imm as usize] as i32;
+                    self.csr[instr.imm as usize] |= self.reg_file[instr.rs1 as usize] as u32;
+                    self.pc += 4;
+                }
+                // csrrc
+                0b011 => {
+                    self.reg_file[instr.rd as usize] = self.csr[instr.imm as usize] as i32;
+                    self.csr[instr.imm as usize] &= !self.reg_file[instr.rs1 as usize] as u32;
+                    self.pc += 4;
+                }
+                // csrrwi
+                0b101 => {
+                    self.reg_file[instr.rd as usize] = self.csr[instr.imm as usize] as i32;
+                    self.csr[instr.imm as usize] = instr.rs1;
+                    self.pc += 4;
+                }
+                // csrrsi
+                0b110 => {
+                    self.reg_file[instr.rd as usize] = self.csr[instr.imm as usize] as i32;
+                    self.csr[instr.imm as usize] |= instr.rs1;
+                    self.pc += 4;
+                }
+                // csrrci
+                0b111 => {
+                    self.reg_file[instr.rd as usize] = self.csr[instr.imm as usize] as i32;
+                    self.csr[instr.imm as usize] &= !instr.rs1;
+                    self.pc += 4;
+                }
                 // ebreak
                 _ => return Err(InstructionError::NotSupported),
             },
+            // fence, pause
+            0b0001111 => self.pc += 4,
+
             _ => return Err(InstructionError::ExecutionError),
         };
         Ok(())

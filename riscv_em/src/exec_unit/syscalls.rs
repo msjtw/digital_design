@@ -38,7 +38,7 @@ impl SystemCall {
                     Ok(x) => x,
                     Err(_) => return Err(InstructionError::ExecutionError),
                 };
-                println!("{s}");
+                print!("{s}");
                 Ok(())
             }
             93 => Err(InstructionError::End),

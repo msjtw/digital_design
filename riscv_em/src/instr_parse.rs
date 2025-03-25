@@ -9,6 +9,7 @@ pub struct RType {
     pub rs1: u32,
     pub rs2: u32,
     pub funct3: u32,
+    pub funct5: u32,
     pub funct7: u32,
 }
 
@@ -20,7 +21,8 @@ impl RType {
             rs1: (byte_code & 1015808) >> 15,
             rs2: (byte_code & 32505856) >> 20,
             funct3: (byte_code & 28672) >> 12,
-            funct7: (byte_code & 4261412864) >> 25,
+            funct5: byte_code >> 27,
+            funct7: byte_code >> 25,
         }
     }
 }
