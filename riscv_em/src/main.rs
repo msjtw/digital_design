@@ -1,10 +1,10 @@
+mod core;
+mod soc;
 use std::env;
 use std::error::Error;
-use std::process;
-mod exec_unit;
-mod instr_parse;
 use std::fs;
 use std::io;
+use std::process;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -16,14 +16,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let data = fs::read(&args[1])?;
     let file = object::File::parse(&*data)?;
 
-    let mut proc = exec_unit::Processor::read_data(&file)?;
+    let mut proc = core::Core::read_data(&file)?;
     loop {
         let mut guess = String::new();
         match proc.exec() {
             Ok(_) => {}
             Err(x) => {
                 match x {
-                    instr_parse::InstructionError::End => (),
+                    core::instr_parse::InstructionError::End => (),
                     _ => println!("{:?}", x),
                 }
                 break;

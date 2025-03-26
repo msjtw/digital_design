@@ -1,6 +1,5 @@
-use crate::instr_parse::InstructionError;
-
-use super::Processor;
+use crate::core::Core;
+use crate::core::instr_parse::InstructionError;
 
 #[derive(Debug)]
 pub struct SystemCall {
@@ -9,7 +8,7 @@ pub struct SystemCall {
 }
 
 impl SystemCall {
-    pub fn from(proc: &Processor) -> Self {
+    pub fn from(proc: &Core) -> Self {
         SystemCall {
             number: proc.reg_file[17] as u32,
             args: {
@@ -22,7 +21,7 @@ impl SystemCall {
         }
     }
 
-    pub fn exec(&self, proc: &mut Processor) -> Result<(), InstructionError> {
+    pub fn exec(&self, proc: &mut Core) -> Result<(), InstructionError> {
         match self.number {
             64 => {
                 if self.args[0] != 1 {
