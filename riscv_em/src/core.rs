@@ -2,77 +2,84 @@ use object::{Object, ObjectSegment};
 use std::{error::Error, fmt, u32};
 
 pub mod instr_parse;
-use crate::soc::memory;
+use crate::memory;
 use instr_parse::{Instruction, InstructionError};
 
 mod datapath;
 mod syscalls;
 
 #[derive(Debug)]
-pub enum ElfError {
+pub enum ExecError {
+    Error,
     NotLittleEndian,
+    InstructionError(InstructionError),
     DataReadError,
+    End,
 }
 
-impl From<object::Error> for ElfError {
+impl From<InstructionError> for ExecError {
+    fn from(err: InstructionError) -> Self {
+        Self::InstructionError(err)
+    }
+}
+
+impl From<object::Error> for ExecError {
     fn from(_value: object::Error) -> Self {
         Self::DataReadError
     }
 }
 
-impl Error for ElfError {}
+impl Error for ExecError {}
 
-impl fmt::Display for ElfError {
+impl fmt::Display for ExecError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::Error => write!(f, "Error!"),
             Self::NotLittleEndian => write!(f, "ELF must be little endian!"),
             Self::DataReadError => write!(f, "Error reading data from ELF!"),
+            Self::InstructionError(x) => write!(f, "Instruction Error {x}"),
+            Self::End => write!(f, "End of execution!"),
         }
     }
 }
 
-pub struct Core {
+#[derive(Debug)]
+pub struct Core<'a> {
     pc: u32,
     reg_file: [i32; 32],
     csr: [u32; 4096],
-    memory: memory::Memory,
+    memory: &'a mut memory::Memory,
 
     lr_address: u32,
     lr_valid: bool,
 }
 
-impl Default for Core {
-    fn default() -> Self {
-        Core {
+impl<'a> Core<'a> {
+    pub fn new<'b>(memory: &'a mut memory::Memory) -> Self {
+        let c = Core {
             pc: 0,
             reg_file: [0; 32],
             csr: [0; 4096],
-            memory: memory::Memory::new(),
-
+            memory,
             lr_address: 0,
             lr_valid: false,
-        }
-    }
-}
-
-impl Core {
-    pub fn read_data(elf: &object::File) -> Result<Core, ElfError> {
-        if !elf.is_little_endian() {
-            return Err(ElfError::NotLittleEndian);
-        }
-        let mut proc: Core = Core {
-            pc: elf.entry() as u32,
-            ..Default::default()
         };
+        c
+    }
+    pub fn read_data(&mut self, elf: &object::File) -> Result<(), ExecError> {
+        if !elf.is_little_endian() {
+            return Err(ExecError::NotLittleEndian);
+        }
+        self.pc = elf.entry() as u32;
         for segment in elf.segments() {
             let addr = segment.address() as u32;
             for i in 0..segment.data()?.iter().len() {
-                proc.memory
+                self.memory
                     .insert_byte(addr + i as u32, segment.data()?[i as usize]);
             }
         }
-        proc.reg_file[2] = 0xBFFFFFF0u32 as i32;
-        Ok(proc)
+        self.reg_file[2] = 0xBFFFFFF0u32 as i32;
+        Ok(())
     }
 
     fn print_reg_file(&self) {
@@ -93,7 +100,7 @@ impl Core {
         println!("");
     }
 
-    pub fn exec(&mut self) -> Result<(), InstructionError> {
+    pub fn exec(&mut self) -> Result<(), ExecError> {
         let byte_code = self.memory.get_word(self.pc);
         // print!("{:5x?};", self.pc);
         let instr = Instruction::from(byte_code)?;
@@ -110,7 +117,7 @@ impl Core {
         // self.print_reg_file();
 
         if self.pc == 0 {
-            Err(InstructionError::End)
+            Err(ExecError::End)
         } else {
             Ok(())
         }

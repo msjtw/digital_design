@@ -1,5 +1,5 @@
-use crate::core::Core;
 use crate::core::instr_parse::InstructionError;
+use crate::core::{Core, ExecError};
 
 #[derive(Debug)]
 pub struct SystemCall {
@@ -21,11 +21,11 @@ impl SystemCall {
         }
     }
 
-    pub fn exec(&self, proc: &mut Core) -> Result<(), InstructionError> {
+    pub fn exec(&self, proc: &mut Core) -> Result<(), ExecError> {
         match self.number {
             64 => {
                 if self.args[0] != 1 {
-                    return Err(InstructionError::NotSupported);
+                    return Err(ExecError::InstructionError(InstructionError::NotSupported));
                 }
                 let addr = self.args[1];
                 let len = self.args[2];
@@ -35,13 +35,13 @@ impl SystemCall {
                 }
                 let s = match String::from_utf8(buff) {
                     Ok(x) => x,
-                    Err(_) => return Err(InstructionError::ExecutionError),
+                    Err(_) => return Err(ExecError::Error),
                 };
                 print!("{s}");
                 Ok(())
             }
-            93 => Err(InstructionError::End),
-            _ => Err(InstructionError::NotSupported),
+            93 => Err(ExecError::End),
+            _ => Err(ExecError::InstructionError(InstructionError::NotSupported)),
         }
     }
 }

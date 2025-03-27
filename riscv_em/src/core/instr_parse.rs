@@ -233,10 +233,9 @@ impl JType {
 
 #[derive(Debug)]
 pub enum InstructionError {
+    NoInstruction,
     WrongOpcode,
-    ExecutionError,
     NotSupported,
-    End,
 }
 
 impl Error for InstructionError {}
@@ -245,9 +244,8 @@ impl fmt::Display for InstructionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::WrongOpcode => write!(f, "Instruction opcode doesn't match any type!"),
-            Self::ExecutionError => write!(f, "Operation execution was impossible!"),
+            Self::NoInstruction => write!(f, "No such instruction"),
             Self::NotSupported => write!(f, "Operation not supported!"),
-            Self::End => write!(f, "End of execution!"),
         }
     }
 }

@@ -2,7 +2,9 @@ use crate::core::Core;
 use crate::core::instr_parse::{BType, IType, InstructionError, JType, RType, SType, UType};
 use crate::core::syscalls;
 
-pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
+use super::ExecError;
+
+pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), ExecError> {
     match instr.opcode {
         0b0110011 => {
             match instr.funct3 {
@@ -24,7 +26,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
                         let tmp = a * b;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
-                    _ => return Err(InstructionError::ExecutionError),
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
                 0x4 => match instr.funct7 {
                     //xor
@@ -37,7 +39,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
                         core.reg_file[instr.rd as usize] =
                             core.reg_file[instr.rs1 as usize] / core.reg_file[instr.rs2 as usize];
                     }
-                    _ => return Err(InstructionError::ExecutionError),
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
                 0x6 => match instr.funct7 {
                     //or
@@ -50,7 +52,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
                         core.reg_file[instr.rd as usize] =
                             core.reg_file[instr.rs1 as usize] % core.reg_file[instr.rs2 as usize];
                     }
-                    _ => return Err(InstructionError::ExecutionError),
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
                 0x7 => match instr.funct7 {
                     //and
@@ -65,7 +67,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
                             % core.reg_file[instr.rs2 as usize] as u32)
                             as i32;
                     }
-                    _ => return Err(InstructionError::ExecutionError),
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
                 0x1 => match instr.funct7 {
                     //sll
@@ -80,7 +82,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
                         let tmp = (a * b) >> 32;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
-                    _ => return Err(InstructionError::ExecutionError),
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
                 0x5 => match instr.funct7 {
                     //srl
@@ -102,7 +104,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
                         core.reg_file[instr.rd as usize] =
                             core.reg_file[instr.rs1 as usize] >> core.reg_file[instr.rs2 as usize];
                     }
-                    _ => return Err(InstructionError::ExecutionError),
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
                 0x2 => match instr.funct7 {
                     //slt
@@ -122,7 +124,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
                         let tmp = (a * b) >> 32;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
-                    _ => return Err(InstructionError::ExecutionError),
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
                 0x3 => match instr.funct7 {
                     //sltu
@@ -143,10 +145,10 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
                         let tmp = (a * b) >> 32;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
-                    _ => return Err(InstructionError::ExecutionError),
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
 
-                _ => return Err(InstructionError::ExecutionError),
+                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
             };
             core.pc += 4;
         }
@@ -293,15 +295,15 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), InstructionError> {
                 );
                 core.pc += 4;
             }
-            _ => return Err(InstructionError::ExecutionError),
+            _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
         },
-        _ => return Err(InstructionError::ExecutionError),
+        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
 
     Ok(())
 }
 
-pub fn exec_i(core: &mut Core, instr: &IType) -> Result<(), InstructionError> {
+pub fn exec_i(core: &mut Core, instr: &IType) -> Result<(), ExecError> {
     match instr.opcode {
         0b0010011 => {
             match instr.funct3 {
@@ -341,7 +343,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<(), InstructionError> {
                         core.reg_file[instr.rd as usize] =
                             core.reg_file[instr.rs1 as usize] >> (instr.imm & 31);
                     }
-                    _ => return Err(InstructionError::ExecutionError),
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
                 //slti
                 0x2 => {
@@ -361,7 +363,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<(), InstructionError> {
                             0
                         };
                 }
-                _ => return Err(InstructionError::ExecutionError),
+                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
             };
             core.pc += 4;
         }
@@ -388,7 +390,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<(), InstructionError> {
                 0x5 => {
                     core.reg_file[instr.rd as usize] = core.memory.get_hword(addr) as i32;
                 }
-                _ => return Err(InstructionError::ExecutionError),
+                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
             };
             core.pc += 4;
         }
@@ -441,17 +443,17 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<(), InstructionError> {
                 core.pc += 4;
             }
             // ebreak
-            _ => return Err(InstructionError::NotSupported),
+            _ => return Err(ExecError::InstructionError(InstructionError::NotSupported)),
         },
         // fence, pause
         0b0001111 => core.pc += 4,
 
-        _ => return Err(InstructionError::ExecutionError),
+        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     Ok(())
 }
 
-pub fn exec_s(core: &mut Core, instr: &SType) -> Result<(), InstructionError> {
+pub fn exec_s(core: &mut Core, instr: &SType) -> Result<(), ExecError> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
     match instr.funct3 {
         //sb
@@ -466,13 +468,13 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<(), InstructionError> {
         0x2 => core
             .memory
             .insert_word(addr, core.reg_file[instr.rs2 as usize] as u32),
-        _ => return Err(InstructionError::ExecutionError),
+        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     core.pc += 4;
     Ok(())
 }
 
-pub fn exec_b(core: &mut Core, instr: &BType) -> Result<(), InstructionError> {
+pub fn exec_b(core: &mut Core, instr: &BType) -> Result<(), ExecError> {
     let rs1 = core.reg_file[instr.rs1 as usize];
     let rs2 = core.reg_file[instr.rs2 as usize];
     match instr.funct3 {
@@ -518,13 +520,13 @@ pub fn exec_b(core: &mut Core, instr: &BType) -> Result<(), InstructionError> {
                 return Ok(());
             };
         }
-        _ => return Err(InstructionError::ExecutionError),
+        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     core.pc += 4;
     Ok(())
 }
 
-pub fn exec_u(core: &mut Core, instr: &UType) -> Result<(), InstructionError> {
+pub fn exec_u(core: &mut Core, instr: &UType) -> Result<(), ExecError> {
     match instr.opcode {
         //lui
         0b0110111 => {
@@ -534,20 +536,20 @@ pub fn exec_u(core: &mut Core, instr: &UType) -> Result<(), InstructionError> {
         0b0010111 => {
             core.reg_file[instr.rd as usize] = core.pc as i32 + (instr.imm << 12);
         }
-        _ => return Err(InstructionError::ExecutionError),
+        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     core.pc += 4;
     Ok(())
 }
 
-pub fn exec_j(core: &mut Core, instr: &JType) -> Result<(), InstructionError> {
+pub fn exec_j(core: &mut Core, instr: &JType) -> Result<(), ExecError> {
     match instr.opcode {
         //jal
         0b1101111 => {
             core.reg_file[instr.rd as usize] = (core.pc + 4) as i32;
             core.pc = (core.pc as i32 + instr.imm) as u32;
         }
-        _ => return Err(InstructionError::ExecutionError),
+        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     Ok(())
 }
