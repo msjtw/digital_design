@@ -1,15 +1,29 @@
+pub enum Csr {
+    Mtime,
+    Mtimecmp,
+}
 
- #[derive(Debug)]
+#[derive(Debug)]
 pub struct Memory {
     base_addr: u32,
     data: [u8; super::RAM_SIZE],
+
+    mtime: u32,
+    mtimeh: u32,
+    mtimecmp: u32,
+    mtimecmph: u32,
 }
 
 impl Default for Memory {
     fn default() -> Self {
         Memory {
-            base_addr: 0x80000000,
+            base_addr: super::RAM_OFFSET,
             data: [0; super::RAM_SIZE],
+
+            mtime: 0,
+            mtimeh: 0,
+            mtimecmp: 0,
+            mtimecmph: 0,
         }
     }
 }
@@ -17,7 +31,13 @@ impl Default for Memory {
 impl Memory {
     pub fn get_word(&self, addr: u32) -> u32 {
         if addr < self.base_addr {
-            // TODO: CRS access
+            return match addr {
+                0x10000005 => 0, // TODO: UART
+                0x10000000 => 0, // TODO: UART
+                0x1100bffc => self.mtimeh,
+                0x1100bff8 => self.mtime,
+                _ => 0, // TODO: read error,
+            };
         }
         let mut address = (addr - self.base_addr) as usize;
         let d = self.data[address] as u32;
@@ -46,10 +66,20 @@ impl Memory {
         let address = (addr - self.base_addr) as usize;
         self.data[address]
     }
-    
+
     pub fn insert_word(&mut self, addr: u32, data: u32) {
         if addr < self.base_addr {
-            // TODO: CSR access
+            match addr {
+                0x10000000 => {} // TODO: UART;
+                0x11100000 => {} // TODO: SYSCON;
+                0x11004004 => {
+                    self.mtimecmph = data;
+                }
+                0x11004000 => {
+                    self.mtimecmp = data;
+                }
+                _ => {} // TODO: write error
+            };
         }
         let address = (addr - self.base_addr) as usize;
         let mut mask: u32 = (1 << 8) - 1;
@@ -83,5 +113,32 @@ impl Memory {
         }
         let address = (addr - self.base_addr) as usize;
         self.data[address] = data;
+    }
+
+    pub fn csr_read(&self, csr: Csr) -> u64 {
+        match csr {
+            Csr::Mtime => {
+                let mtimel = self.get_word(0x1100bff8);
+                let mtimeh = self.get_word(0x1100bffc);
+                (mtimeh as u64) << 32 + mtimel as u64
+            }
+            Csr::Mtimecmp => {
+                let mtimecmpl = self.get_word(0x11004000);
+                let mtimecmph = self.get_word(0x11004004);
+                (mtimecmph as u64) << 32 + mtimecmpl as u64
+            }
+        }
+    }
+    pub fn csr_write(&mut self, csr: Csr, val: u64) -> () {
+        match csr {
+            Csr::Mtime => {
+                self.insert_word(0x1100bff8, val as u32);
+                self.insert_word(0x1100bffc, (val >> 32) as u32);
+            }
+            Csr::Mtimecmp => {
+                self.insert_word(0x11004000, val as u32);
+                self.insert_word(0x11004004, (val >> 32) as u32);
+            }
+        }
     }
 }

@@ -2,9 +2,9 @@ use crate::core::Core;
 use crate::core::instr_parse::{BType, IType, InstructionError, JType, RType, SType, UType};
 use crate::core::syscalls;
 
-use super::ExecError;
+use super::{ExecError, State};
 
-pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), ExecError> {
+pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
     match instr.opcode {
         0b0110011 => {
             match instr.funct3 {
@@ -300,10 +300,10 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<(), ExecError> {
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
 
-    Ok(())
+    Ok(State::Ok)
 }
 
-pub fn exec_i(core: &mut Core, instr: &IType) -> Result<(), ExecError> {
+pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
     match instr.opcode {
         0b0010011 => {
             match instr.funct3 {
@@ -400,60 +400,87 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<(), ExecError> {
             core.pc = (core.reg_file[instr.rs1 as usize] as i32 + instr.imm) as u32;
         }
         0b1110011 => match instr.funct7 {
-            //ecall
-            0x0 => {
+            // csr_filerw
+            0b001 => {
+                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
+                core.csr_file[instr.imm as usize] = core.reg_file[instr.rs1 as usize] as u32;
+                core.pc += 4;
+            }
+            // csr_filers
+            0b010 => {
+                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
+                core.csr_file[instr.imm as usize] |= core.reg_file[instr.rs1 as usize] as u32;
+                core.pc += 4;
+            }
+            // csr_filerc
+            0b011 => {
+                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
+                core.csr_file[instr.imm as usize] &= !core.reg_file[instr.rs1 as usize] as u32;
+                core.pc += 4;
+            }
+            // csr_filerwi
+            0b101 => {
+                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
+                core.csr_file[instr.imm as usize] = instr.rs1;
+                core.pc += 4;
+            }
+            // csr_filersi
+            0b110 => {
+                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
+                core.csr_file[instr.imm as usize] |= instr.rs1;
+                core.pc += 4;
+            }
+            // csr_filerci
+            0b111 => {
+                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
+                core.csr_file[instr.imm as usize] &= !instr.rs1;
+                core.pc += 4;
+            }
+            0b0 => {
+                match instr.imm {
+                    //ecall
+                    0b0 => {
+                        if core.mode == 3 {
+                            // machine ecall
+                            // TODO: implement ecall
+                        } else {
+                            // user ecall
+                            // TODO: implement ecall
+                        }
+                    }
+                    //ebreak
+                    0b1 => {}
+                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                };
                 let syscall = syscalls::SystemCall::from(core);
                 syscall.exec(core)?;
                 core.pc += 4;
             }
-            // csrrw
-            0b001 => {
-                core.reg_file[instr.rd as usize] = core.csr[instr.imm as usize] as i32;
-                core.csr[instr.imm as usize] = core.reg_file[instr.rs1 as usize] as u32;
-                core.pc += 4;
+            // mret
+            0b0011000 => {
+                // TODO: implement mret
             }
-            // csrrs
-            0b010 => {
-                core.reg_file[instr.rd as usize] = core.csr[instr.imm as usize] as i32;
-                core.csr[instr.imm as usize] |= core.reg_file[instr.rs1 as usize] as u32;
-                core.pc += 4;
-            }
-            // csrrc
-            0b011 => {
-                core.reg_file[instr.rd as usize] = core.csr[instr.imm as usize] as i32;
-                core.csr[instr.imm as usize] &= !core.reg_file[instr.rs1 as usize] as u32;
-                core.pc += 4;
-            }
-            // csrrwi
-            0b101 => {
-                core.reg_file[instr.rd as usize] = core.csr[instr.imm as usize] as i32;
-                core.csr[instr.imm as usize] = instr.rs1;
-                core.pc += 4;
-            }
-            // csrrsi
-            0b110 => {
-                core.reg_file[instr.rd as usize] = core.csr[instr.imm as usize] as i32;
-                core.csr[instr.imm as usize] |= instr.rs1;
-                core.pc += 4;
-            }
-            // csrrci
-            0b111 => {
-                core.reg_file[instr.rd as usize] = core.csr[instr.imm as usize] as i32;
-                core.csr[instr.imm as usize] &= !instr.rs1;
-                core.pc += 4;
-            }
-            // ebreak
-            _ => return Err(ExecError::InstructionError(InstructionError::NotSupported)),
+            0b0001000 => match instr.imm {
+                // wfi
+                0b000100000101 => {
+                    *core.csr(super::Csr::Mstatus) &= 1 << 3;
+                    core.wfi = true;
+                    core.pc += 4;
+                    return Ok(State::Sleep);
+                }
+                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+            },
+            _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
         },
         // fence, pause
         0b0001111 => core.pc += 4,
 
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
-    Ok(())
+    Ok(State::Ok)
 }
 
-pub fn exec_s(core: &mut Core, instr: &SType) -> Result<(), ExecError> {
+pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
     match instr.funct3 {
         //sb
@@ -471,10 +498,10 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<(), ExecError> {
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     core.pc += 4;
-    Ok(())
+    Ok(State::Ok)
 }
 
-pub fn exec_b(core: &mut Core, instr: &BType) -> Result<(), ExecError> {
+pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, ExecError> {
     let rs1 = core.reg_file[instr.rs1 as usize];
     let rs2 = core.reg_file[instr.rs2 as usize];
     match instr.funct3 {
@@ -482,51 +509,45 @@ pub fn exec_b(core: &mut Core, instr: &BType) -> Result<(), ExecError> {
         0x0 => {
             if rs1 == rs2 {
                 core.pc = (core.pc as i32 + instr.imm) as u32;
-                return Ok(());
-            }
+            };
         }
         //bne
         0x1 => {
             if rs1 != rs2 {
                 core.pc = (core.pc as i32 + instr.imm) as u32;
-                return Ok(());
-            }
+            };
         }
         //blt
         0x4 => {
             if rs1 < rs2 {
                 core.pc = (core.pc as i32 + instr.imm) as u32;
-                return Ok(());
-            }
+            };
         }
         //bge
         0x5 => {
             if rs1 >= rs2 {
                 core.pc = (core.pc as i32 + instr.imm) as u32;
-                return Ok(());
-            }
+            };
         }
         //bltu
         0x6 => {
             if (rs1 as u32) < (rs2 as u32) {
                 core.pc = (core.pc as i32 + instr.imm) as u32;
-                return Ok(());
-            }
+            };
         }
         //bgeu
         0x7 => {
             if rs1 as u32 >= rs2 as u32 {
                 core.pc = (core.pc as i32 + instr.imm) as u32;
-                return Ok(());
             };
         }
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     core.pc += 4;
-    Ok(())
+    Ok(State::Ok)
 }
 
-pub fn exec_u(core: &mut Core, instr: &UType) -> Result<(), ExecError> {
+pub fn exec_u(core: &mut Core, instr: &UType) -> Result<State, ExecError> {
     match instr.opcode {
         //lui
         0b0110111 => {
@@ -539,10 +560,10 @@ pub fn exec_u(core: &mut Core, instr: &UType) -> Result<(), ExecError> {
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     core.pc += 4;
-    Ok(())
+    Ok(State::Ok)
 }
 
-pub fn exec_j(core: &mut Core, instr: &JType) -> Result<(), ExecError> {
+pub fn exec_j(core: &mut Core, instr: &JType) -> Result<State, ExecError> {
     match instr.opcode {
         //jal
         0b1101111 => {
@@ -551,5 +572,5 @@ pub fn exec_j(core: &mut Core, instr: &JType) -> Result<(), ExecError> {
         }
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
-    Ok(())
+    Ok(State::Ok)
 }
