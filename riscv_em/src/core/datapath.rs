@@ -1,6 +1,5 @@
 use crate::core::Core;
 use crate::core::instr_parse::{BType, IType, InstructionError, JType, RType, SType, UType};
-use crate::core::syscalls;
 
 use super::{ExecError, State};
 
@@ -152,151 +151,92 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
             };
             core.pc += 4;
         }
-        0b0101111 => match instr.funct5 {
-            // LR.W
-            0b00010 => {
-                core.lr_address = core.reg_file[instr.rs1 as usize] as u32;
-                core.lr_valid = true;
-                core.reg_file[instr.rd as usize] = core
-                    .memory
-                    .get_word(core.reg_file[instr.rs1 as usize] as u32)
-                    as i32;
-                core.pc += 4;
-            }
-            // SC.W
-            0b00011 => {
-                if core.lr_valid && (core.lr_address == core.reg_file[instr.rs1 as usize] as u32) {
-                    core.memory.insert_word(
-                        core.reg_file[instr.rs1 as usize] as u32,
-                        core.reg_file[instr.rs2 as usize] as u32,
-                    );
-                    core.reg_file[instr.rd as usize] = 0;
-                } else {
-                    core.reg_file[instr.rd as usize] = 1;
+        0b0101111 => {
+            let tmp;
+            match core
+                .memory
+                .get_word(core.reg_file[instr.rd as usize] as u32)
+            {
+                Ok(x) => tmp = x as i32,
+                Err(x) => {
+                    core.trap = x as i32;
+                    return Ok(State::Ok);
                 }
-                core.lr_address = 0;
-                core.lr_valid = false;
-                core.pc += 4;
+            };
+            match instr.funct5 {
+                // LR.W
+                0b00010 => {
+                    core.reg_file[instr.rd as usize] = tmp;
+                    core.lr_address = core.reg_file[instr.rs1 as usize] as u32;
+                    core.lr_valid = true;
+                    core.pc += 4;
+                    return Ok(State::Ok);
+                }
+                // SC.W
+                0b00011 => {
+                    if core.lr_valid
+                        && (core.lr_address == core.reg_file[instr.rs1 as usize] as u32)
+                    {
+                        core.memory.insert_word(
+                            core.reg_file[instr.rs1 as usize] as u32,
+                            core.reg_file[instr.rs2 as usize] as u32,
+                        );
+                        core.reg_file[instr.rd as usize] = 0;
+                    } else {
+                        core.reg_file[instr.rd as usize] = 1;
+                    }
+                    core.lr_address = 0;
+                    core.lr_valid = false;
+                    core.pc += 4;
+                    return Ok(State::Ok);
+                }
+                // amoswap.w
+                0b00001 => {
+                    core.reg_file[instr.rd as usize] = tmp;
+                    core.reg_file.swap(instr.rd as usize, instr.rs2 as usize);
+                }
+                // amoadd.w
+                0b00000 => {
+                    core.reg_file[instr.rd as usize] = tmp + core.reg_file[instr.rs2 as usize];
+                }
+                // amoxor.w
+                0b00100 => {
+                    core.reg_file[instr.rd as usize] = tmp ^ core.reg_file[instr.rs2 as usize];
+                }
+                // amoand.w
+                0b01100 => {
+                    core.reg_file[instr.rd as usize] = tmp & core.reg_file[instr.rs2 as usize];
+                }
+                // amoor.w
+                0b01000 => {
+                    core.reg_file[instr.rd as usize] = tmp | core.reg_file[instr.rs2 as usize];
+                }
+                //amomin.w
+                0b10000 => {
+                    core.reg_file[instr.rd as usize] = tmp.min(core.reg_file[instr.rs2 as usize]);
+                }
+                // amomax.w
+                0b10100 => {
+                    core.reg_file[instr.rd as usize] = tmp.max(core.reg_file[instr.rs2 as usize]);
+                }
+                // amominu.w
+                0b11000 => {
+                    core.reg_file[instr.rd as usize] =
+                        (tmp as u32).min(core.reg_file[instr.rs2 as usize] as u32) as i32;
+                }
+                // amomaxiu.w
+                0b11100 => {
+                    core.reg_file[instr.rd as usize] =
+                        (tmp as u32).max(core.reg_file[instr.rs2 as usize] as u32) as i32;
+                }
+                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
             }
-            // amoswap.w
-            0b00001 => {
-                core.reg_file[instr.rd as usize] = core
-                    .memory
-                    .get_word(core.reg_file[instr.rs1 as usize] as u32)
-                    as i32;
-                core.reg_file.swap(instr.rd as usize, instr.rs2 as usize);
-                core.memory.insert_word(
-                    core.reg_file[instr.rs1 as usize] as u32,
-                    core.reg_file[instr.rd as usize] as u32,
-                );
-                core.pc += 4;
-            }
-            // amoadd.w
-            0b00000 => {
-                core.reg_file[instr.rd as usize] = core
-                    .memory
-                    .get_word(core.reg_file[instr.rs1 as usize] as u32)
-                    as i32
-                    + core.reg_file[instr.rs2 as usize];
-                core.memory.insert_word(
-                    core.reg_file[instr.rs1 as usize] as u32,
-                    core.reg_file[instr.rd as usize] as u32,
-                );
-                core.pc += 4;
-            }
-            // amoxor.w
-            0b00100 => {
-                core.reg_file[instr.rd as usize] = core
-                    .memory
-                    .get_word(core.reg_file[instr.rs1 as usize] as u32)
-                    as i32
-                    ^ core.reg_file[instr.rs2 as usize];
-                core.memory.insert_word(
-                    core.reg_file[instr.rs1 as usize] as u32,
-                    core.reg_file[instr.rd as usize] as u32,
-                );
-                core.pc += 4;
-            }
-            // amoand.w
-            0b01100 => {
-                core.reg_file[instr.rd as usize] = core
-                    .memory
-                    .get_word(core.reg_file[instr.rs1 as usize] as u32)
-                    as i32
-                    & core.reg_file[instr.rs2 as usize];
-                core.memory.insert_word(
-                    core.reg_file[instr.rs1 as usize] as u32,
-                    core.reg_file[instr.rd as usize] as u32,
-                );
-                core.pc += 4;
-            }
-            // amoor.w
-            0b01000 => {
-                core.reg_file[instr.rd as usize] = core
-                    .memory
-                    .get_word(core.reg_file[instr.rs1 as usize] as u32)
-                    as i32
-                    | core.reg_file[instr.rs2 as usize];
-                core.memory.insert_word(
-                    core.reg_file[instr.rs1 as usize] as u32,
-                    core.reg_file[instr.rd as usize] as u32,
-                );
-                core.pc += 4;
-            }
-            //amomin.w
-            0b10000 => {
-                let tmp = core
-                    .memory
-                    .get_word(core.reg_file[instr.rd as usize] as u32)
-                    as i32;
-                core.reg_file[instr.rd as usize] = tmp.min(core.reg_file[instr.rs2 as usize]);
-                core.memory.insert_word(
-                    core.reg_file[instr.rs1 as usize] as u32,
-                    core.reg_file[instr.rd as usize] as u32,
-                );
-                core.pc += 4;
-            }
-            // amomax.w
-            0b10100 => {
-                let tmp = core
-                    .memory
-                    .get_word(core.reg_file[instr.rd as usize] as u32)
-                    as i32;
-                core.reg_file[instr.rd as usize] = tmp.max(core.reg_file[instr.rs2 as usize]);
-                core.memory.insert_word(
-                    core.reg_file[instr.rs1 as usize] as u32,
-                    core.reg_file[instr.rd as usize] as u32,
-                );
-                core.pc += 4;
-            }
-            // amominu.w
-            0b11000 => {
-                let tmp = core
-                    .memory
-                    .get_word(core.reg_file[instr.rd as usize] as u32);
-                core.reg_file[instr.rd as usize] =
-                    tmp.min(core.reg_file[instr.rs2 as usize] as u32) as i32;
-                core.memory.insert_word(
-                    core.reg_file[instr.rs1 as usize] as u32,
-                    core.reg_file[instr.rd as usize] as u32,
-                );
-                core.pc += 4;
-            }
-            // amomaxiu.w
-            0b11100 => {
-                let tmp = core
-                    .memory
-                    .get_word(core.reg_file[instr.rd as usize] as u32);
-                core.reg_file[instr.rd as usize] =
-                    tmp.max(core.reg_file[instr.rs2 as usize] as u32) as i32;
-                core.memory.insert_word(
-                    core.reg_file[instr.rs1 as usize] as u32,
-                    core.reg_file[instr.rd as usize] as u32,
-                );
-                core.pc += 4;
-            }
-            _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
-        },
+            core.memory.insert_word(
+                core.reg_file[instr.rs1 as usize] as u32,
+                core.reg_file[instr.rd as usize] as u32,
+            );
+            core.pc += 4;
+        }
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
 
@@ -372,23 +312,53 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
             match instr.funct3 {
                 // lb sign-extended
                 0x0 => {
-                    core.reg_file[instr.rd as usize] = core.memory.get_byte(addr).into();
+                    match core.memory.get_byte(addr) {
+                        Ok(x) => core.reg_file[instr.rd as usize] = x.into(),
+                        Err(x) => {
+                            core.trap = x as i32;
+                            return Ok(State::Ok);
+                        }
+                    };
                 }
                 // lh
                 0x1 => {
-                    core.reg_file[instr.rd as usize] = core.memory.get_hword(addr).into();
+                    match core.memory.get_hword(addr) {
+                        Ok(x) => core.reg_file[instr.rd as usize] = x.into(),
+                        Err(x) => {
+                            core.trap = x as i32;
+                            return Ok(State::Ok);
+                        }
+                    };
                 }
                 // lw
                 0x2 => {
-                    core.reg_file[instr.rd as usize] = core.memory.get_word(addr) as i32;
+                    match core.memory.get_word(addr) {
+                        Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
+                        Err(x) => {
+                            core.trap = x as i32;
+                            return Ok(State::Ok);
+                        }
+                    };
                 }
                 // lbu zero-extended
                 0x4 => {
-                    core.reg_file[instr.rd as usize] = core.memory.get_byte(addr) as i32;
+                    match core.memory.get_byte(addr) {
+                        Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
+                        Err(x) => {
+                            core.trap = x as i32;
+                            return Ok(State::Ok);
+                        }
+                    };
                 }
                 // lhu
                 0x5 => {
-                    core.reg_file[instr.rd as usize] = core.memory.get_hword(addr) as i32;
+                    match core.memory.get_hword(addr) {
+                        Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
+                        Err(x) => {
+                            core.trap = x as i32;
+                            return Ok(State::Ok);
+                        }
+                    };
                 }
                 _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
             };
@@ -442,23 +412,34 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                     0b0 => {
                         if core.mode == 3 {
                             // machine ecall
-                            // TODO: implement ecall
+                            core.trap = 11;
                         } else {
                             // user ecall
-                            // TODO: implement ecall
+                            core.trap = 8;
                         }
+                        core.pc += 4;
                     }
                     //ebreak
-                    0b1 => {}
+                    0b1 => {
+                        core.trap = 3;
+                        core.pc += 4;
+                    }
                     _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 };
-                let syscall = syscalls::SystemCall::from(core);
-                syscall.exec(core)?;
                 core.pc += 4;
             }
             // mret
             0b0011000 => {
-                // TODO: implement mret
+                // restore last mode and save current
+                core.mode = (*core.csr(super::Csr::Mstatus) >> 11) & 0b11;
+                *core.csr(super::Csr::Mstatus) &= !0b11 << 11;
+                *core.csr(super::Csr::Mstatus) |= core.mode << 11;
+                // restore mie and set mpie to 1
+                *core.csr(super::Csr::Mstatus) &= !0b1000;
+                *core.csr(super::Csr::Mstatus) |= (*core.csr(super::Csr::Mstatus) & 1 << 7) >> 4;
+                *core.csr(super::Csr::Mstatus) |= 1 << 7;
+                // restore pc
+                core.pc = *core.csr(super::Csr::Mepc);
             }
             0b0001000 => match instr.imm {
                 // wfi
@@ -482,7 +463,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
 
 pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
-    match instr.funct3 {
+    let x = match instr.funct3 {
         //sb
         0x0 => core
             .memory
@@ -497,7 +478,10 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
             .insert_word(addr, core.reg_file[instr.rs2 as usize] as u32),
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
-    core.pc += 4;
+    match x {
+        Ok(_) => core.pc += 4,
+        Err(x) => core.trap = x as i32,
+    }
     Ok(State::Ok)
 }
 

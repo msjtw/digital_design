@@ -1,3 +1,5 @@
+mod uart;
+
 pub enum Csr {
     Mtime,
     Mtimecmp,
@@ -7,6 +9,7 @@ pub enum Csr {
 pub struct Memory {
     base_addr: u32,
     data: [u8; super::RAM_SIZE],
+    memory_size: u32,
 
     mtime: u32,
     mtimeh: u32,
@@ -19,6 +22,7 @@ impl Default for Memory {
         Memory {
             base_addr: super::RAM_OFFSET,
             data: [0; super::RAM_SIZE],
+            memory_size: super::RAM_OFFSET + super::RAM_SIZE as u32,
 
             mtime: 0,
             mtimeh: 0,
@@ -29,14 +33,17 @@ impl Default for Memory {
 }
 
 impl Memory {
-    pub fn get_word(&self, addr: u32) -> u32 {
-        if addr < self.base_addr {
+    pub fn get_word(&self, addr: u32) -> Result<u32, u32> {
+        if addr & 0b11 > 0 {
+            return Err(4);
+        }
+        if addr < self.base_addr || addr > self.memory_size {
             return match addr {
-                0x10000005 => 0, // TODO: UART
-                0x10000000 => 0, // TODO: UART
-                0x1100bffc => self.mtimeh,
-                0x1100bff8 => self.mtime,
-                _ => 0, // TODO: read error,
+                0x10000005 => {} // TODO: UART
+                0x10000000 => {} // TODO: UART
+                0x1100bffc => Ok(self.mtimeh),
+                0x1100bff8 => Ok(self.mtime),
+                _ => Err(5),
             };
         }
         let mut address = (addr - self.base_addr) as usize;
@@ -47,27 +54,33 @@ impl Memory {
         let b = self.data[address] as u32;
         address += 1;
         let a = self.data[address] as u32;
-        (a << 24) + (b << 16) + (c << 8) + d
+        Ok((a << 24) + (b << 16) + (c << 8) + d)
     }
-    pub fn get_hword(&self, addr: u32) -> u16 {
+    pub fn get_hword(&self, addr: u32) -> Result<u16, u32> {
+        if addr & 0b1 > 0 {
+            return Err(4);
+        }
         if addr < self.base_addr {
-            // TODO: Error
+            return Err(5);
         }
         let mut address = (addr - self.base_addr) as usize;
         let b = self.data[address] as u16;
         address += 1;
         let a = self.data[address] as u16;
-        (a << 8) + b
+        Ok((a << 8) + b)
     }
-    pub fn get_byte(&self, addr: u32) -> u8 {
+    pub fn get_byte(&self, addr: u32) -> Result<u8, i32> {
         if addr < self.base_addr {
-            // TODO: Error
+            return Err(5);
         }
         let address = (addr - self.base_addr) as usize;
-        self.data[address]
+        Ok(self.data[address])
     }
 
-    pub fn insert_word(&mut self, addr: u32, data: u32) {
+    pub fn insert_word(&mut self, addr: u32, data: u32) -> Result<(), u32> {
+        if addr & 0b11 > 0 {
+            return Err(6);
+        }
         if addr < self.base_addr {
             match addr {
                 0x10000000 => {} // TODO: UART;
@@ -78,8 +91,9 @@ impl Memory {
                 0x11004000 => {
                     self.mtimecmp = data;
                 }
-                _ => {} // TODO: write error
+                _ => return Err(7),
             };
+            return Ok(());
         }
         let address = (addr - self.base_addr) as usize;
         let mut mask: u32 = (1 << 8) - 1;
@@ -94,10 +108,14 @@ impl Memory {
         self.data[address + 1] = c;
         self.data[address + 2] = b;
         self.data[address + 3] = a;
+        Ok(())
     }
-    pub fn insert_hword(&mut self, addr: u32, data: u16) {
+    pub fn insert_hword(&mut self, addr: u32, data: u16) -> Result<(), u32> {
+        if addr & 0b1 > 0 {
+            return Err(6);
+        }
         if addr < self.base_addr {
-            // TODO: Error
+            return Err(7);
         }
         let address = (addr - self.base_addr) as usize;
         let mut mask: u16 = (2 << 8) - 1;
@@ -106,25 +124,27 @@ impl Memory {
         let c: u8 = ((data & mask) >> 8).try_into().unwrap();
         self.data[address] = d;
         self.data[address + 1] = c;
+        Ok(())
     }
-    pub fn insert_byte(&mut self, addr: u32, data: u8) {
+    pub fn insert_byte(&mut self, addr: u32, data: u8) -> Result<(), u32> {
         if addr < self.base_addr {
-            // TODO: Error
+            return Err(7);
         }
         let address = (addr - self.base_addr) as usize;
         self.data[address] = data;
+        Ok(())
     }
 
     pub fn csr_read(&self, csr: Csr) -> u64 {
         match csr {
             Csr::Mtime => {
-                let mtimel = self.get_word(0x1100bff8);
-                let mtimeh = self.get_word(0x1100bffc);
+                let mtimel = self.get_word(0x1100bff8).unwrap();
+                let mtimeh = self.get_word(0x1100bffc).unwrap();
                 (mtimeh as u64) << 32 + mtimel as u64
             }
             Csr::Mtimecmp => {
-                let mtimecmpl = self.get_word(0x11004000);
-                let mtimecmph = self.get_word(0x11004004);
+                let mtimecmpl = self.get_word(0x11004000).unwrap();
+                let mtimecmph = self.get_word(0x11004004).unwrap();
                 (mtimecmph as u64) << 32 + mtimecmpl as u64
             }
         }

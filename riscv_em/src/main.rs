@@ -2,7 +2,6 @@ mod core;
 mod memory;
 use std::env;
 use std::error::Error;
-use std::io;
 use std::process;
 
 const RAM_SIZE: usize = 64 * (1 << 10);
@@ -29,7 +28,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         let diff_cycle = curr_cycle - last_cycle;
         last_cycle = curr_cycle;
 
-        // let mut guess = String::new();
         match proc.exec(diff_cycle) {
             Ok(x) => match x {
                 core::State::Ok => {}
@@ -48,10 +46,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 break;
             }
         }
-
-        // io::stdin()
-        //     .read_line(&mut guess)
-        //     .expect("Failed to read line");
     }
 
     Ok(())

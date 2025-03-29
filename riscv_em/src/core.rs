@@ -1,12 +1,9 @@
-use object::{Object, ObjectSegment};
-use std::{error::Error, fmt, fs, u32};
-
-pub mod instr_parse;
-use crate::memory::{self, Memory};
-use instr_parse::{Instruction, InstructionError};
-
 mod datapath;
-mod syscalls;
+pub mod instr_parse;
+
+use crate::memory;
+use instr_parse::{Instruction, InstructionError};
+use std::{error::Error, fmt, fs, u32};
 
 #[derive(Debug)]
 pub enum State {
@@ -72,7 +69,7 @@ pub struct Core<'a> {
     csr_file: [u32; 4096],
     memory: &'a mut memory::Memory,
 
-    trap: u32,
+    trap: i32,
     lr_address: u32,
     lr_valid: bool,
     mode: u32,
@@ -87,7 +84,7 @@ impl<'a> Core<'a> {
             csr_file: [0; 4096],
             memory,
 
-            trap: 0,
+            trap: -1,
             lr_address: 0,
             lr_valid: false,
             mode: 0,
@@ -95,6 +92,7 @@ impl<'a> Core<'a> {
         };
         c
     }
+
     pub fn read_data(
         &mut self,
         kernel: &str,
@@ -146,6 +144,7 @@ impl<'a> Core<'a> {
 
         if mtime > mtimecmp {
             *self.csr(Csr::Mip) |= 1 << 7;
+            self.wfi = false;
         } else {
             *self.csr(Csr::Mip) &= !(1 << 7);
         }
@@ -159,41 +158,62 @@ impl<'a> Core<'a> {
             // Global interrupt enabled
             if ((*self.csr(Csr::Mie) & 1 << 7) & (*self.csr(Csr::Mip) & 1 << 7)) != 0 {
                 // machine timer interrupt
+                self.trap = 0x80000007;
             }
         } else {
-            let byte_code = self.memory.get_word(self.pc);
-            let instr = Instruction::from(byte_code)?;
-            match instr {
-                Instruction::R(x) => {
-                    rd = x.rd;
-                    datapath::exec_r(self, &x)
+            if self.pc & 0b11 > 0 {
+                // check instruction address aligment
+                self.trap = 0;
+            } else {
+                let memory_result = self.memory.get_word(self.pc);
+                match memory_result {
+                    Ok(byte_code) => {
+                        let instr = Instruction::from(byte_code)?;
+                        match match instr {
+                            Instruction::R(x) => {
+                                rd = x.rd;
+                                datapath::exec_r(self, &x)
+                            }
+                            Instruction::I(x) => {
+                                rd = x.rd;
+                                datapath::exec_i(self, &x)
+                            }
+                            Instruction::U(x) => {
+                                rd = x.rd;
+                                datapath::exec_u(self, &x)
+                            }
+                            Instruction::J(x) => {
+                                rd = x.rd;
+                                datapath::exec_j(self, &x)
+                            }
+                            Instruction::S(x) => datapath::exec_s(self, &x),
+                            Instruction::B(x) => datapath::exec_b(self, &x),
+                        } {
+                            Ok(_) => {}
+                            Err(ExecError::InstructionError(InstructionError::NoInstruction))
+                            | Err(ExecError::InstructionError(InstructionError::NotSupported)) => {
+                                self.trap = 2;
+                            }
+                            Err(x) => return Err(x),
+                        };
+                        self.reg_file[0] = 0;
+                    }
+                    Err(_) => {
+                        // Instruction access fault
+                        self.trap = 1;
+                    }
                 }
-                Instruction::I(x) => {
-                    rd = x.rd;
-                    datapath::exec_i(self, &x)
-                }
-                Instruction::U(x) => {
-                    rd = x.rd;
-                    datapath::exec_u(self, &x)
-                }
-                Instruction::J(x) => {
-                    rd = x.rd;
-                    datapath::exec_j(self, &x)
-                }
-                Instruction::S(x) => datapath::exec_s(self, &x),
-                Instruction::B(x) => datapath::exec_b(self, &x),
-            }?;
-            self.reg_file[0] = 0;
+            }
         }
 
-        if self.trap != 0 {
+        if self.trap >= 0 {
             if self.trap & 1 << 31 != 0 {
                 // interrupt
-                *self.csr(Csr::Mcause) = self.trap;
+                *self.csr(Csr::Mcause) = self.trap as u32;
                 *self.csr(Csr::Mtval) = 0;
             } else {
                 // trap
-                *self.csr(Csr::Mcause) = self.trap;
+                *self.csr(Csr::Mcause) = self.trap as u32;
                 if self.trap > 5 && self.trap <= 8 {
                     // address misaligned, access fault, ecall
                     *self.csr(Csr::Mtval) = self.reg_file[rd as usize] as u32;
@@ -201,8 +221,23 @@ impl<'a> Core<'a> {
                     *self.csr(Csr::Mtval) = self.pc;
                 }
             }
+
+            // save mode into mpp
+            *self.csr(Csr::Mstatus) &= !0b11 << 11;
+            *self.csr(Csr::Mstatus) |= self.mode << 11;
+            // save mie into mpie
+            *self.csr(Csr::Mstatus) &= !0b1 << 7;
+            *self.csr(Csr::Mstatus) |= (*self.csr(Csr::Mstatus) & 1 << 3) << 4;
+
+            // save pc
+            *self.csr(Csr::Mepc) = self.pc;
+            // jump to handler
+            self.pc = *self.csr(Csr::Mtvec);
+
+            // enter machine mode
             self.mode = 3;
-            self.trap = 0;
+            // clear trap
+            self.trap = -1;
         }
 
         if *self.csr(Csr::Cycle) == u32::MAX {

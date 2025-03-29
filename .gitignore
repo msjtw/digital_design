@@ -4,3 +4,4 @@ assembly/
 vcd_dump/
 elf_test/
 riscv_em/target
+buildroot/
