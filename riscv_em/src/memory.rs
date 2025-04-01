@@ -39,8 +39,8 @@ impl Memory {
         }
         if addr < self.base_addr || addr > self.memory_size {
             return match addr {
-                0x10000005 => {} // TODO: UART
-                0x10000000 => {} // TODO: UART
+                0x10000000 => Ok(0), // TODO: UART
+                0x10000005 => Ok(0), // TODO: UART
                 0x1100bffc => Ok(self.mtimeh),
                 0x1100bff8 => Ok(self.mtime),
                 _ => Err(5),
@@ -83,7 +83,9 @@ impl Memory {
         }
         if addr < self.base_addr {
             match addr {
-                0x10000000 => {} // TODO: UART;
+                0x10000000 => {
+                    print!("{data}")
+                } // TODO: UART;
                 0x11100000 => {} // TODO: SYSCON;
                 0x11004004 => {
                     self.mtimecmph = data;

@@ -18,7 +18,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut memory = memory::Memory::default();
     let mut proc = core::Core::new(&mut memory);
-    proc.read_data(&file, "devicetree.dtb")?;
+    proc.read_data(
+        &file,
+        "/home/msjtw/Documents/digital_design/sixtyfourmb.dtb",
+    )?;
 
     let mut last_cycle: u64 = 0;
 

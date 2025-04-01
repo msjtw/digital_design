@@ -99,14 +99,18 @@ impl<'a> Core<'a> {
         dtb: &str,
     ) -> Result<(), Box<dyn std::error::Error + 'static>> {
         let data = fs::read(kernel)?;
+        println!("{}", data.len());
         for i in 0..data.len() {
-            self.memory
+            let _ = self
+                .memory
                 .insert_byte(i as u32 + super::RAM_OFFSET, data[i]);
         }
 
+        println!("kernel");
+
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
-            self.memory.insert_byte(
+            let _ = self.memory.insert_byte(
                 super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32 + i as u32,
                 data[i],
             );
@@ -158,7 +162,7 @@ impl<'a> Core<'a> {
             // Global interrupt enabled
             if ((*self.csr(Csr::Mie) & 1 << 7) & (*self.csr(Csr::Mip) & 1 << 7)) != 0 {
                 // machine timer interrupt
-                self.trap = 0x80000007;
+                self.trap = 0x80000007u32 as i32;
             }
         } else {
             if self.pc & 0b11 > 0 {
