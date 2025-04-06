@@ -265,15 +265,13 @@ impl Instruction {
         let opcode = byte_code & 127;
         match opcode {
             0b0110011 => Ok(Instruction::R(RType::from(byte_code))),
-            0b0010011 => Ok(Instruction::I(IType::from(byte_code))),
-            0b0000011 => Ok(Instruction::I(IType::from(byte_code))),
+            0b0010011 | 0b0000011 | 0b1100111 | 0b1110011 | 0b0001111 => {
+                Ok(Instruction::I(IType::from(byte_code)))
+            }
             0b0100011 => Ok(Instruction::S(SType::from(byte_code))),
             0b1100011 => Ok(Instruction::B(BType::from(byte_code))),
             0b1101111 => Ok(Instruction::J(JType::from(byte_code))),
-            0b1100111 => Ok(Instruction::I(IType::from(byte_code))),
-            0b0110111 => Ok(Instruction::U(UType::from(byte_code))),
-            0b0010111 => Ok(Instruction::U(UType::from(byte_code))),
-            0b1110011 => Ok(Instruction::I(IType::from(byte_code))),
+            0b0110111 | 0b0010111 => Ok(Instruction::U(UType::from(byte_code))),
             _ => {
                 println!("{opcode:b}");
                 println!("{byte_code:b}");

@@ -8,7 +8,7 @@ pub enum Csr {
 #[derive(Debug)]
 pub struct Memory {
     base_addr: u32,
-    data: [u8; super::RAM_SIZE],
+    data: Vec<u8>,
     memory_size: u32,
 
     mtime: u32,
@@ -21,7 +21,7 @@ impl Default for Memory {
     fn default() -> Self {
         Memory {
             base_addr: super::RAM_OFFSET,
-            data: [0; super::RAM_SIZE],
+            data: vec![0; super::RAM_SIZE],
             memory_size: super::RAM_OFFSET + super::RAM_SIZE as u32,
 
             mtime: 0,
@@ -43,6 +43,8 @@ impl Memory {
                 0x10000005 => Ok(0), // TODO: UART
                 0x1100bffc => Ok(self.mtimeh),
                 0x1100bff8 => Ok(self.mtime),
+                0x11004004 => Ok(self.mtimecmph),
+                0x11004000 => Ok(self.mtimecmp),
                 _ => Err(5),
             };
         }

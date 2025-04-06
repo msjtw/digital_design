@@ -4,7 +4,7 @@ use std::env;
 use std::error::Error;
 use std::process;
 
-const RAM_SIZE: usize = 64 * (1 << 10);
+const RAM_SIZE: usize = 64 * (1 << 20);
 const RAM_OFFSET: u32 = 0x80000000;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -24,10 +24,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     let mut last_cycle: u64 = 0;
-
     loop {
         let curr_cycle =
-            (*proc.csr(core::Csr::Cycleh) as u64) << 32 + (*proc.csr(core::Csr::Cycle) as u64);
+            ((*proc.csr(core::Csr::Cycleh) as u64) << 32) + (*proc.csr(core::Csr::Cycle) as u64);
         let diff_cycle = curr_cycle - last_cycle;
         last_cycle = curr_cycle;
 
@@ -48,6 +47,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("{:?}", x);
                 break;
             }
+        }
+        if last_cycle > 1000 {
+            break;
         }
     }
 

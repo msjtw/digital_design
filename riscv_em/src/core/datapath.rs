@@ -367,92 +367,97 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
         //jalr
         0b1100111 => {
             core.reg_file[instr.rd as usize] = (core.pc + 4) as i32;
-            core.pc = (core.reg_file[instr.rs1 as usize] as i32 + instr.imm) as u32;
+            // println!("{} {}", core.reg_file[instr.rs1 as usize], instr.imm);
+            core.pc = (core.reg_file[instr.rs1 as usize] as i64 + instr.imm as i64) as u32;
         }
-        0b1110011 => match instr.funct7 {
-            // csr_filerw
-            0b001 => {
-                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
-                core.csr_file[instr.imm as usize] = core.reg_file[instr.rs1 as usize] as u32;
-                core.pc += 4;
-            }
-            // csr_filers
-            0b010 => {
-                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
-                core.csr_file[instr.imm as usize] |= core.reg_file[instr.rs1 as usize] as u32;
-                core.pc += 4;
-            }
-            // csr_filerc
-            0b011 => {
-                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
-                core.csr_file[instr.imm as usize] &= !core.reg_file[instr.rs1 as usize] as u32;
-                core.pc += 4;
-            }
-            // csr_filerwi
-            0b101 => {
-                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
-                core.csr_file[instr.imm as usize] = instr.rs1;
-                core.pc += 4;
-            }
-            // csr_filersi
-            0b110 => {
-                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
-                core.csr_file[instr.imm as usize] |= instr.rs1;
-                core.pc += 4;
-            }
-            // csr_filerci
-            0b111 => {
-                core.reg_file[instr.rd as usize] = core.csr_file[instr.imm as usize] as i32;
-                core.csr_file[instr.imm as usize] &= !instr.rs1;
-                core.pc += 4;
-            }
-            0b0 => {
-                match instr.imm {
-                    //ecall
-                    0b0 => {
-                        if core.mode == 3 {
-                            // machine ecall
-                            core.trap = 11;
-                        } else {
-                            // user ecall
-                            core.trap = 8;
-                        }
-                        core.pc += 4;
-                    }
-                    //ebreak
-                    0b1 => {
-                        core.trap = 3;
-                        core.pc += 4;
-                    }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
-                };
-                core.pc += 4;
-            }
-            // mret
-            0b0011000 => {
-                // restore last mode and save current
-                core.mode = (*core.csr(super::Csr::Mstatus) >> 11) & 0b11;
-                *core.csr(super::Csr::Mstatus) &= !0b11 << 11;
-                *core.csr(super::Csr::Mstatus) |= core.mode << 11;
-                // restore mie and set mpie to 1
-                *core.csr(super::Csr::Mstatus) &= !0b1000;
-                *core.csr(super::Csr::Mstatus) |= (*core.csr(super::Csr::Mstatus) & 1 << 7) >> 4;
-                *core.csr(super::Csr::Mstatus) |= 1 << 7;
-                // restore pc
-                core.pc = *core.csr(super::Csr::Mepc);
-            }
-            0b0001000 => match instr.imm {
-                // wfi
-                0b000100000101 => {
-                    *core.csr(super::Csr::Mstatus) &= 1 << 3;
-                    core.wfi = true;
+        0b1110011 => {
+            let imm = (instr.imm & 4095) as usize;
+            match instr.funct3 {
+                // csr_filerw
+                0b001 => {
+                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
+                    core.csr_file[imm] = core.reg_file[instr.rs1 as usize] as u32;
                     core.pc += 4;
-                    return Ok(State::Sleep);
+                }
+                // csr_filers
+                0b010 => {
+                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
+                    core.csr_file[imm] |= core.reg_file[instr.rs1 as usize] as u32;
+                    core.pc += 4;
+                }
+                // csr_filerc
+                0b011 => {
+                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
+                    core.csr_file[imm] &= !core.reg_file[instr.rs1 as usize] as u32;
+                    core.pc += 4;
+                }
+                // csr_filerwi
+                0b101 => {
+                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
+                    core.csr_file[imm] = instr.rs1;
+                    core.pc += 4;
+                }
+                // csr_filersi
+                0b110 => {
+                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
+                    core.csr_file[imm] |= instr.rs1;
+                    core.pc += 4;
+                }
+                // csr_filerci
+                0b111 => {
+                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
+                    core.csr_file[imm] &= !instr.rs1;
+                    core.pc += 4;
+                }
+                0b0 => {
+                    match instr.imm {
+                        //ecall
+                        0b0 => {
+                            if core.mode == 3 {
+                                // machine ecall
+                                core.trap = 11;
+                            } else {
+                                // user ecall
+                                core.trap = 8;
+                            }
+                            core.pc += 4;
+                        }
+                        //ebreak
+                        0b1 => {
+                            core.trap = 3;
+                            core.pc += 4;
+                        }
+                        // mret
+                        0b0011000 => {
+                            // restore last mode and save current
+                            core.mode = (*core.csr(super::Csr::Mstatus) >> 11) & 0b11;
+                            *core.csr(super::Csr::Mstatus) &= !0b11 << 11;
+                            *core.csr(super::Csr::Mstatus) |= core.mode << 11;
+                            // restore mie and set mpie to 1
+                            *core.csr(super::Csr::Mstatus) &= !0b1000;
+                            *core.csr(super::Csr::Mstatus) |=
+                                (*core.csr(super::Csr::Mstatus) & 1 << 7) >> 4;
+                            *core.csr(super::Csr::Mstatus) |= 1 << 7;
+                            // restore pc
+                            core.pc = *core.csr(super::Csr::Mepc);
+                        }
+                        // wfi
+                        0b000100000101 => {
+                            *core.csr(super::Csr::Mstatus) &= 1 << 3;
+                            core.wfi = true;
+                            core.pc += 4;
+                            return Ok(State::Sleep);
+                        }
+                        _ => {
+                            return Err(ExecError::InstructionError(
+                                InstructionError::NoInstruction,
+                            ));
+                        }
+                    }
                 }
                 _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
-            },
-            _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
-        },
+            };
+        }
         // fence, pause
         0b0001111 => core.pc += 4,
 

@@ -64,7 +64,7 @@ pub enum Csr {
 
 #[derive(Debug)]
 pub struct Core<'a> {
-    pc: u32,
+    pub pc: u32,
     reg_file: [i32; 32],
     csr_file: [u32; 4096],
     memory: &'a mut memory::Memory,
@@ -99,14 +99,11 @@ impl<'a> Core<'a> {
         dtb: &str,
     ) -> Result<(), Box<dyn std::error::Error + 'static>> {
         let data = fs::read(kernel)?;
-        println!("{}", data.len());
         for i in 0..data.len() {
             let _ = self
                 .memory
                 .insert_byte(i as u32 + super::RAM_OFFSET, data[i]);
         }
-
-        println!("kernel");
 
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
@@ -124,21 +121,41 @@ impl<'a> Core<'a> {
     }
 
     fn print_reg_file(&self) {
-        for i in 0..32 {
-            print!("{:6}", i);
-        }
-        println!("");
         println!(
-            "  zero    ra    sp    gp    tp    t0    t1    t2    s0    s1    a0    a1    a2    a3    a4    a5    a6    a7    s2    s3    s4    s5    s6    s7    s8    s9   s10   s11    t3    t4    t5    t6"
+            "Z:{:8x} ra:{:8x} sp:{:8x} gp:{:8x} tp:{:8x} t0:{:8x} t1:{:8x} t2:{:8x} s0:{:8x} s1:{:8x} a0:{:8x} a1:{:8x} a2:{:8x} a3:{:8x} a4:{:8x} a5:{:8x} a6:{:8x} a7:{:8x} s2:{:8x} s3:{:8x} s4:{:8x} s5:{:8x} s6:{:8x} s7:{:8x} s8:{:8x} s9:{:8x} s10:{:8x} s11:{:8x} t3:{:8x} t4:{:8x} t5:{:8x} t6: {:8x}",
+            self.reg_file[0] as u32,
+            self.reg_file[1] as u32,
+            self.reg_file[2] as u32,
+            self.reg_file[3] as u32,
+            self.reg_file[4] as u32,
+            self.reg_file[5] as u32,
+            self.reg_file[6] as u32,
+            self.reg_file[7] as u32,
+            self.reg_file[8] as u32,
+            self.reg_file[9] as u32,
+            self.reg_file[10] as u32,
+            self.reg_file[11] as u32,
+            self.reg_file[12] as u32,
+            self.reg_file[13] as u32,
+            self.reg_file[14] as u32,
+            self.reg_file[15] as u32,
+            self.reg_file[16] as u32,
+            self.reg_file[17] as u32,
+            self.reg_file[18] as u32,
+            self.reg_file[19] as u32,
+            self.reg_file[20] as u32,
+            self.reg_file[21] as u32,
+            self.reg_file[22] as u32,
+            self.reg_file[23] as u32,
+            self.reg_file[24] as u32,
+            self.reg_file[25] as u32,
+            self.reg_file[26] as u32,
+            self.reg_file[27] as u32,
+            self.reg_file[28] as u32,
+            self.reg_file[29] as u32,
+            self.reg_file[30] as u32,
+            self.reg_file[31] as u32,
         );
-        for i in 0..32 {
-            if self.reg_file[i].to_string().len() > 5 {
-                print!("    --");
-            } else {
-                print!("{:6}", self.reg_file[i]);
-            }
-        }
-        println!("");
     }
 
     pub fn exec(&mut self, last_op_time: u64) -> Result<State, ExecError> {
@@ -170,9 +187,12 @@ impl<'a> Core<'a> {
                 self.trap = 0;
             } else {
                 let memory_result = self.memory.get_word(self.pc);
+                println!("{:?}: {:?}", self.pc, memory_result.unwrap());
                 match memory_result {
                     Ok(byte_code) => {
                         let instr = Instruction::from(byte_code)?;
+                        // println!("{:?}", instr);
+                        self.print_reg_file();
                         match match instr {
                             Instruction::R(x) => {
                                 rd = x.rd;
