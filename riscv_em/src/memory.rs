@@ -34,9 +34,10 @@ impl Default for Memory {
 
 impl Memory {
     pub fn get_word(&self, addr: u32) -> Result<u32, u32> {
-        if addr & 0b11 > 0 {
-            return Err(4);
-        }
+        // if addr & 0b11 > 0 {
+        //     println!("{}", addr & 0b11);
+        //     return Err(4);
+        // }
         if addr < self.base_addr || addr > self.memory_size {
             return match addr {
                 0x10000000 => Ok(0), // TODO: UART
@@ -59,9 +60,9 @@ impl Memory {
         Ok((a << 24) + (b << 16) + (c << 8) + d)
     }
     pub fn get_hword(&self, addr: u32) -> Result<u16, u32> {
-        if addr & 0b1 > 0 {
-            return Err(4);
-        }
+        // if addr & 0b1 > 0 {
+        //     return Err(4);
+        // }
         if addr < self.base_addr {
             return Err(5);
         }
@@ -80,9 +81,9 @@ impl Memory {
     }
 
     pub fn insert_word(&mut self, addr: u32, data: u32) -> Result<(), u32> {
-        if addr & 0b11 > 0 {
-            return Err(6);
-        }
+        // if addr & 0b11 > 0 {
+        //     return Err(6);
+        // }
         if addr < self.base_addr {
             match addr {
                 0x10000000 => {
@@ -115,9 +116,9 @@ impl Memory {
         Ok(())
     }
     pub fn insert_hword(&mut self, addr: u32, data: u16) -> Result<(), u32> {
-        if addr & 0b1 > 0 {
-            return Err(6);
-        }
+        // if addr & 0b1 > 0 {
+        //     return Err(6);
+        // }
         if addr < self.base_addr {
             return Err(7);
         }
@@ -132,7 +133,14 @@ impl Memory {
     }
     pub fn insert_byte(&mut self, addr: u32, data: u8) -> Result<(), u32> {
         if addr < self.base_addr {
-            return Err(7);
+            match addr {
+                0x10000000 => {
+                    print!("{data}")
+                } // TODO: UART;
+                0x11100000 => {} // TODO: SYSCON;
+                _ => return Err(7),
+            };
+            return Ok(());
         }
         let address = (addr - self.base_addr) as usize;
         self.data[address] = data;

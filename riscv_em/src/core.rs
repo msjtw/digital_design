@@ -120,9 +120,9 @@ impl<'a> Core<'a> {
         Ok(())
     }
 
-    fn print_reg_file(&self) {
+    pub fn print_reg_file(&self) {
         println!(
-            "Z:{:8x} ra:{:8x} sp:{:8x} gp:{:8x} tp:{:8x} t0:{:8x} t1:{:8x} t2:{:8x} s0:{:8x} s1:{:8x} a0:{:8x} a1:{:8x} a2:{:8x} a3:{:8x} a4:{:8x} a5:{:8x} a6:{:8x} a7:{:8x} s2:{:8x} s3:{:8x} s4:{:8x} s5:{:8x} s6:{:8x} s7:{:8x} s8:{:8x} s9:{:8x} s10:{:8x} s11:{:8x} t3:{:8x} t4:{:8x} t5:{:8x} t6: {:8x}",
+            "Z:{:08x} ra:{:08x} sp:{:08x} gp:{:08x} tp:{:08x} t0:{:08x} t1:{:08x} t2:{:08x} s0:{:08x} s1:{:08x} a0:{:08x} a1:{:08x} a2:{:08x} a3:{:08x} a4:{:08x} a5:{:08x} a6:{:08x} a7:{:08x} s2:{:08x} s3:{:08x} s4:{:08x} s5:{:08x} s6:{:08x} s7:{:08x} s8:{:08x} s9:{:08x} s10:{:08x} s11:{:08x} t3:{:08x} t4:{:08x} t5:{:08x} t6:{:08x}",
             self.reg_file[0] as u32,
             self.reg_file[1] as u32,
             self.reg_file[2] as u32,
@@ -187,12 +187,12 @@ impl<'a> Core<'a> {
                 self.trap = 0;
             } else {
                 let memory_result = self.memory.get_word(self.pc);
-                println!("{:?}: {:?}", self.pc, memory_result.unwrap());
+                self.print_reg_file();
+                print!("{:?}: ", self.pc);
+                println!("{:?}", memory_result.unwrap());
                 match memory_result {
                     Ok(byte_code) => {
                         let instr = Instruction::from(byte_code)?;
-                        // println!("{:?}", instr);
-                        self.print_reg_file();
                         match match instr {
                             Instruction::R(x) => {
                                 rd = x.rd;

@@ -11,7 +11,9 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     //add
                     0x00 => {
                         core.reg_file[instr.rd as usize] =
-                            core.reg_file[instr.rs1 as usize] + core.reg_file[instr.rs2 as usize];
+                            (i64::from(core.reg_file[instr.rs1 as usize])
+                                + i64::from(core.reg_file[instr.rs2 as usize]))
+                                as i32;
                     }
                     //sub
                     0x20 => {
@@ -99,7 +101,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                             as i32;
                     }
                     //sra
-                    0x02 => {
+                    0x20 => {
                         core.reg_file[instr.rd as usize] =
                             core.reg_file[instr.rs1 as usize] >> core.reg_file[instr.rs2 as usize];
                     }
@@ -155,7 +157,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
             let tmp;
             match core
                 .memory
-                .get_word(core.reg_file[instr.rd as usize] as u32)
+                .get_word(core.reg_file[instr.rs1 as usize] as u32)
             {
                 Ok(x) => tmp = x as i32,
                 Err(x) => {
@@ -209,6 +211,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                 }
                 // amoor.w
                 0b01000 => {
+                    // println!("co {:b} | {:b}", tmp, core.reg_file[instr.rs2 as usize]);
                     core.reg_file[instr.rd as usize] = tmp | core.reg_file[instr.rs2 as usize];
                 }
                 //amomin.w
@@ -250,7 +253,8 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                 //addi
                 0x0 => {
                     core.reg_file[instr.rd as usize] =
-                        core.reg_file[instr.rs1 as usize] + instr.imm;
+                        (i64::from(core.reg_file[instr.rs1 as usize]) + i64::from(instr.imm))
+                            as i32;
                 }
                 //xori
                 0x4 => {
@@ -335,6 +339,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                     match core.memory.get_word(addr) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(x) => {
+                            println!("yo errro {:?}", x);
                             core.trap = x as i32;
                             return Ok(State::Ok);
                         }
@@ -366,9 +371,16 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
         }
         //jalr
         0b1100111 => {
-            core.reg_file[instr.rd as usize] = (core.pc + 4) as i32;
-            // println!("{} {}", core.reg_file[instr.rs1 as usize], instr.imm);
-            core.pc = (core.reg_file[instr.rs1 as usize] as i64 + instr.imm as i64) as u32;
+            // println!(
+            //     "{} + {} = {}",
+            //     core.reg_file[1] as u32,
+            //     i64::from(instr.imm),
+            //     (i64::from(core.reg_file[instr.rs1 as usize] as u32) + i64::from(instr.imm)) as u32
+            // );
+            let tmp_pc = core.pc;
+            core.pc =
+                (i64::from(core.reg_file[instr.rs1 as usize] as u32) + i64::from(instr.imm)) as u32;
+            core.reg_file[instr.rd as usize] = (tmp_pc + 4) as i32;
         }
         0b1110011 => {
             let imm = (instr.imm & 4095) as usize;
@@ -493,6 +505,7 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
 pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, ExecError> {
     let rs1 = core.reg_file[instr.rs1 as usize];
     let rs2 = core.reg_file[instr.rs2 as usize];
+    let last_pc = core.pc;
     match instr.funct3 {
         //beq
         0x0 => {
@@ -532,7 +545,9 @@ pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, ExecError> {
         }
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
-    core.pc += 4;
+    if core.pc == last_pc {
+        core.pc += 4;
+    }
     Ok(State::Ok)
 }
 

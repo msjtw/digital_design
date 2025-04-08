@@ -264,7 +264,7 @@ impl Instruction {
     pub fn from(byte_code: u32) -> Result<Self, InstructionError> {
         let opcode = byte_code & 127;
         match opcode {
-            0b0110011 => Ok(Instruction::R(RType::from(byte_code))),
+            0b0110011 | 0b0101111 => Ok(Instruction::R(RType::from(byte_code))),
             0b0010011 | 0b0000011 | 0b1100111 | 0b1110011 | 0b0001111 => {
                 Ok(Instruction::I(IType::from(byte_code)))
             }
