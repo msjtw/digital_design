@@ -88,9 +88,10 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                 0x5 => match instr.funct7 {
                     //srl
                     0x00 => {
+                        // println!("{}", core.reg_file[instr.rs2 as usize] as u32);
                         core.reg_file[instr.rd as usize] = (core.reg_file[instr.rs1 as usize]
                             as u32
-                            >> core.reg_file[instr.rs2 as usize])
+                            >> core.reg_file[instr.rs2 as usize] as u32)
                             as i32;
                     }
                     //divu
@@ -317,7 +318,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                 // lb sign-extended
                 0x0 => {
                     match core.memory.get_byte(addr) {
-                        Ok(x) => core.reg_file[instr.rd as usize] = x.into(),
+                        Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i8),
                         Err(x) => {
                             core.trap = x as i32;
                             return Ok(State::Ok);
@@ -327,7 +328,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                 // lh
                 0x1 => {
                     match core.memory.get_hword(addr) {
-                        Ok(x) => core.reg_file[instr.rd as usize] = x.into(),
+                        Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i16),
                         Err(x) => {
                             core.trap = x as i32;
                             return Ok(State::Ok);
@@ -555,11 +556,12 @@ pub fn exec_u(core: &mut Core, instr: &UType) -> Result<State, ExecError> {
     match instr.opcode {
         //lui
         0b0110111 => {
-            core.reg_file[instr.rd as usize] = instr.imm << 12;
+            core.reg_file[instr.rd as usize] = (instr.imm << 12) as i32;
         }
         //auipc
         0b0010111 => {
-            core.reg_file[instr.rd as usize] = core.pc as i32 + (instr.imm << 12);
+            core.reg_file[instr.rd as usize] =
+                (i64::from(core.pc) + i64::from(instr.imm << 12)) as i32;
         }
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };

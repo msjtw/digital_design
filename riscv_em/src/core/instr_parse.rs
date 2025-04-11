@@ -173,7 +173,7 @@ impl BType {
 pub struct UType {
     pub opcode: u32,
     pub rd: u32,
-    pub imm: i32,
+    pub imm: u32,
 }
 
 impl UType {
@@ -181,7 +181,7 @@ impl UType {
         Self {
             opcode: byte_code & 127,
             rd: (byte_code & 3968) >> 7,
-            imm: ((byte_code & 4294963200) >> 12) as i32,
+            imm: ((byte_code) >> 12),
         }
     }
 }

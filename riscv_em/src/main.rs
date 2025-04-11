@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 break;
             }
         }
-        if last_cycle > 300000 {
+        if last_cycle > 2000000 {
             break;
         }
     }

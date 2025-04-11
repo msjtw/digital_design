@@ -46,7 +46,7 @@ impl Memory {
                 0x1100bff8 => Ok(self.mtime),
                 0x11004004 => Ok(self.mtimecmph),
                 0x11004000 => Ok(self.mtimecmp),
-                _ => Err(5),
+                _ => Ok(0),
             };
         }
         let mut address = (addr - self.base_addr) as usize;
@@ -63,9 +63,6 @@ impl Memory {
         // if addr & 0b1 > 0 {
         //     return Err(4);
         // }
-        if addr < self.base_addr {
-            return Err(5);
-        }
         let mut address = (addr - self.base_addr) as usize;
         let b = self.data[address] as u16;
         address += 1;
@@ -73,8 +70,12 @@ impl Memory {
         Ok((a << 8) + b)
     }
     pub fn get_byte(&self, addr: u32) -> Result<u8, i32> {
-        if addr < self.base_addr {
-            return Err(5);
+        if addr < self.base_addr || addr > self.memory_size {
+            return match addr {
+                0x10000000 => Ok(0),          // TODO: UART
+                0x10000005 => Ok(0x00000060), // TODO: UART
+                _ => Ok(0),
+            };
         }
         let address = (addr - self.base_addr) as usize;
         Ok(self.data[address])
@@ -87,7 +88,7 @@ impl Memory {
         if addr < self.base_addr {
             match addr {
                 0x10000000 => {
-                    print!("{data}")
+                    print!("|{}", data)
                 } // TODO: UART;
                 0x11100000 => {} // TODO: SYSCON;
                 0x11004004 => {
@@ -96,19 +97,19 @@ impl Memory {
                 0x11004000 => {
                     self.mtimecmp = data;
                 }
-                _ => return Err(7),
+                _ => {}
             };
             return Ok(());
         }
         let address = (addr - self.base_addr) as usize;
         let mut mask: u32 = (1 << 8) - 1;
-        let d: u8 = (data & mask).try_into().unwrap();
+        let d: u8 = (data & mask) as u8;
         mask <<= 8;
-        let c: u8 = ((data & mask) >> 8).try_into().unwrap();
+        let c: u8 = ((data & mask) >> 8) as u8;
         mask <<= 8;
-        let b: u8 = ((data & mask) >> 16).try_into().unwrap();
+        let b: u8 = ((data & mask) >> 16) as u8;
         mask <<= 8;
-        let a: u8 = ((data & mask) >> 24).try_into().unwrap();
+        let a: u8 = ((data & mask) >> 24) as u8;
         self.data[address] = d;
         self.data[address + 1] = c;
         self.data[address + 2] = b;
@@ -124,9 +125,9 @@ impl Memory {
         }
         let address = (addr - self.base_addr) as usize;
         let mut mask: u16 = (2 << 8) - 1;
-        let d: u8 = (data & mask).try_into().unwrap();
+        let d: u8 = (data & mask) as u8;
         mask <<= 8;
-        let c: u8 = ((data & mask) >> 8).try_into().unwrap();
+        let c: u8 = ((data & mask) >> 8) as u8;
         self.data[address] = d;
         self.data[address + 1] = c;
         Ok(())
@@ -135,10 +136,10 @@ impl Memory {
         if addr < self.base_addr {
             match addr {
                 0x10000000 => {
-                    print!("{data}")
+                    print!("{}", data as char)
                 } // TODO: UART;
                 0x11100000 => {} // TODO: SYSCON;
-                _ => return Err(7),
+                _ => {}
             };
             return Ok(());
         }
