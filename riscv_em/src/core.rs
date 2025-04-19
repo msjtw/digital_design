@@ -67,8 +67,9 @@ pub struct Core<'a> {
     pub pc: u32,
     reg_file: [i32; 32],
     csr_file: [u32; 4096],
-    memory: &'a mut memory::Memory,
+    pub memory: &'a mut memory::Memory,
 
+    pub intr_count: u64,
     trap: i32,
     lr_address: u32,
     lr_valid: bool,
@@ -83,6 +84,8 @@ impl<'a> Core<'a> {
             reg_file: [0; 32],
             csr_file: [0; 4096],
             memory,
+
+            intr_count: 0,
 
             trap: -1,
             lr_address: 0,
@@ -117,11 +120,13 @@ impl<'a> Core<'a> {
         self.reg_file[10] = 0x00; // hart ID
         self.reg_file[11] = (super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32) as i32;
         self.mode = 3;
+        self.csr_file[0xf11] = 0xff0ff0ff; // mvendorid
+        self.csr_file[0x301] = 0x40401101; // misa
         Ok(())
     }
 
-    pub fn print_reg_file(&self) {
-        println!(
+    pub fn print_reg_file(&self) -> String {
+        format!(
             "Z:{:08x} ra:{:08x} sp:{:08x} gp:{:08x} tp:{:08x} t0:{:08x} t1:{:08x} t2:{:08x} s0:{:08x} s1:{:08x} a0:{:08x} a1:{:08x} a2:{:08x} a3:{:08x} a4:{:08x} a5:{:08x} a6:{:08x} a7:{:08x} s2:{:08x} s3:{:08x} s4:{:08x} s5:{:08x} s6:{:08x} s7:{:08x} s8:{:08x} s9:{:08x} s10:{:08x} s11:{:08x} t3:{:08x} t4:{:08x} t5:{:08x} t6:{:08x}",
             self.reg_file[0] as u32,
             self.reg_file[1] as u32,
@@ -155,12 +160,15 @@ impl<'a> Core<'a> {
             self.reg_file[29] as u32,
             self.reg_file[30] as u32,
             self.reg_file[31] as u32,
-        );
+        )
     }
 
     pub fn exec(&mut self, last_op_time: u64) -> Result<State, ExecError> {
+        self.intr_count += 1;
+
         let mtime = self.memory.csr_read(memory::Csr::Mtime) + last_op_time;
-        self.memory.csr_write(memory::Csr::Mtime, mtime);
+        self.memory.csr_write(memory::Csr::Mtime, mtime).unwrap();
+
         let mtimecmp = self.memory.csr_read(memory::Csr::Mtimecmp);
 
         if mtime > mtimecmp {
@@ -186,10 +194,17 @@ impl<'a> Core<'a> {
                 // check instruction address aligment
                 self.trap = 0;
             } else {
+                if *self.csr(Csr::Cycle) == u32::MAX {
+                    *self.csr(Csr::Cycleh) += 1;
+                    *self.csr(Csr::Cycle) = 0;
+                } else {
+                    *self.csr(Csr::Cycle) += 1;
+                }
                 let memory_result = self.memory.get_word(self.pc);
-                self.print_reg_file();
-                print!("{:?}: ", self.pc);
-                println!("{:?}", memory_result.unwrap());
+                if super::DEBUG {
+                    println!("{}", self.print_reg_file());
+                    println!("{:?}: {:?}", self.pc, memory_result.unwrap());
+                }
                 match memory_result {
                     Ok(byte_code) => {
                         let instr = Instruction::from(byte_code)?;
@@ -263,12 +278,6 @@ impl<'a> Core<'a> {
             // clear trap
             self.trap = -1;
         }
-
-        if *self.csr(Csr::Cycle) == u32::MAX {
-            *self.csr(Csr::Cycleh) += 1;
-            *self.csr(Csr::Cycle) = 0;
-        }
-        *self.csr(Csr::Cycle) += 1;
 
         Ok(State::Ok)
     }

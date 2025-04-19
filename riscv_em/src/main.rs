@@ -6,6 +6,7 @@ use std::process;
 
 const RAM_SIZE: usize = 64 * (1 << 20);
 const RAM_OFFSET: u32 = 0x80000000;
+const DEBUG: bool = false;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -33,7 +34,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         match proc.exec(diff_cycle) {
             Ok(x) => match x {
                 core::State::Ok => {}
-                core::State::Sleep => {}
+                core::State::Sleep => {
+                    println!("sleeeeeeeeep");
+                }
                 core::State::Reboot => {
                     println!("Shutting down...");
                     break;
@@ -48,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 break;
             }
         }
-        if last_cycle > 2000000 {
+        if DEBUG && last_cycle > 3243639 {
             break;
         }
     }

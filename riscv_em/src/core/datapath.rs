@@ -17,8 +17,14 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     }
                     //sub
                     0x20 => {
+                        //     println!(
+                        //         "{} {}",
+                        //         core.reg_file[instr.rs1 as usize], core.reg_file[instr.rs2 as usize]
+                        //     );
                         core.reg_file[instr.rd as usize] =
-                            core.reg_file[instr.rs1 as usize] - core.reg_file[instr.rs2 as usize];
+                            (i64::from(core.reg_file[instr.rs1 as usize])
+                                - i64::from(core.reg_file[instr.rs2 as usize]))
+                                as i32;
                     }
                     //mul
                     0x01 => {
@@ -74,7 +80,9 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     //sll
                     0x00 => {
                         core.reg_file[instr.rd as usize] =
-                            core.reg_file[instr.rs1 as usize] << core.reg_file[instr.rs2 as usize];
+                            (u64::from(core.reg_file[instr.rs1 as usize] as u32)
+                                << (core.reg_file[instr.rs2 as usize] as u32).min(31))
+                                as i32;
                     }
                     //mulh
                     0x01 => {
@@ -88,11 +96,10 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                 0x5 => match instr.funct7 {
                     //srl
                     0x00 => {
-                        // println!("{}", core.reg_file[instr.rs2 as usize] as u32);
-                        core.reg_file[instr.rd as usize] = (core.reg_file[instr.rs1 as usize]
-                            as u32
-                            >> core.reg_file[instr.rs2 as usize] as u32)
-                            as i32;
+                        core.reg_file[instr.rd as usize] =
+                            (u64::from(core.reg_file[instr.rs1 as usize] as u32)
+                                >> (core.reg_file[instr.rs2 as usize] as u32).min(31))
+                                as i32;
                     }
                     //divu
                     0x01 => {
@@ -122,7 +129,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     //mulsu
                     0x01 => {
                         let a: i64 = core.reg_file[instr.rs1 as usize].into();
-                        let b: i64 = core.reg_file[instr.rs2 as usize] as i64;
+                        let b = u64::from(core.reg_file[instr.rs2 as usize] as u32) as i64;
                         let tmp = (a * b) >> 32;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
@@ -142,8 +149,8 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     }
                     //mulu
                     0x01 => {
-                        let a: i64 = core.reg_file[instr.rs1 as usize] as i64;
-                        let b: i64 = core.reg_file[instr.rs2 as usize] as i64;
+                        let a = u64::from(core.reg_file[instr.rs1 as usize] as u32);
+                        let b = u64::from(core.reg_file[instr.rs2 as usize] as u32);
                         let tmp = (a * b) >> 32;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
@@ -481,6 +488,10 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
 
 pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
+    // if addr == 0x10000000 && core.reg_file[instr.rs2 as usize] as u8 as char == '[' {
+    //     // core.print_reg_file();
+    //     println!("{}", core.print_reg_file());
+    // }
     let x = match instr.funct3 {
         //sb
         0x0 => core

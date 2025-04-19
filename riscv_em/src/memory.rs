@@ -69,7 +69,7 @@ impl Memory {
         let a = self.data[address] as u16;
         Ok((a << 8) + b)
     }
-    pub fn get_byte(&self, addr: u32) -> Result<u8, i32> {
+    pub fn get_byte(&self, addr: u32) -> Result<u8, u32> {
         if addr < self.base_addr || addr > self.memory_size {
             return match addr {
                 0x10000000 => Ok(0),          // TODO: UART
@@ -91,10 +91,17 @@ impl Memory {
                     print!("|{}", data)
                 } // TODO: UART;
                 0x11100000 => {} // TODO: SYSCON;
+                0x1100bffc => {
+                    self.mtimeh = data;
+                }
+                0x1100bff8 => {
+                    self.mtime = data;
+                }
                 0x11004004 => {
                     self.mtimecmph = data;
                 }
                 0x11004000 => {
+                    println!("----> {}", data);
                     self.mtimecmp = data;
                 }
                 _ => {}
@@ -136,6 +143,13 @@ impl Memory {
         if addr < self.base_addr {
             match addr {
                 0x10000000 => {
+                    // if data as char == '[' {
+                    //     println!(
+                    //         "timer: {}; timermatch {}",
+                    //         self.csr_read(Csr::Mtime),
+                    //         self.csr_read(Csr::Mtimecmp),
+                    //     );
+                    // }
                     print!("{}", data as char)
                 } // TODO: UART;
                 0x11100000 => {} // TODO: SYSCON;
@@ -153,25 +167,26 @@ impl Memory {
             Csr::Mtime => {
                 let mtimel = self.get_word(0x1100bff8).unwrap();
                 let mtimeh = self.get_word(0x1100bffc).unwrap();
-                (mtimeh as u64) << 32 + mtimel as u64
+                ((mtimeh as u64) << 32) + mtimel as u64
             }
             Csr::Mtimecmp => {
                 let mtimecmpl = self.get_word(0x11004000).unwrap();
                 let mtimecmph = self.get_word(0x11004004).unwrap();
-                (mtimecmph as u64) << 32 + mtimecmpl as u64
+                ((mtimecmph as u64) << 32) + mtimecmpl as u64
             }
         }
     }
-    pub fn csr_write(&mut self, csr: Csr, val: u64) -> () {
+    pub fn csr_write(&mut self, csr: Csr, val: u64) -> Result<(), u32> {
         match csr {
             Csr::Mtime => {
-                self.insert_word(0x1100bff8, val as u32);
-                self.insert_word(0x1100bffc, (val >> 32) as u32);
+                self.insert_word(0x1100bff8, val as u32)?;
+                self.insert_word(0x1100bffc, (val >> 32) as u32)?;
             }
             Csr::Mtimecmp => {
-                self.insert_word(0x11004000, val as u32);
-                self.insert_word(0x11004004, (val >> 32) as u32);
+                self.insert_word(0x11004000, val as u32)?;
+                self.insert_word(0x11004004, (val >> 32) as u32)?;
             }
-        }
+        };
+        Ok(())
     }
 }
