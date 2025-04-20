@@ -17,10 +17,6 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     }
                     //sub
                     0x20 => {
-                        //     println!(
-                        //         "{} {}",
-                        //         core.reg_file[instr.rs1 as usize], core.reg_file[instr.rs2 as usize]
-                        //     );
                         core.reg_file[instr.rd as usize] =
                             (i64::from(core.reg_file[instr.rs1 as usize])
                                 - i64::from(core.reg_file[instr.rs2 as usize]))
@@ -81,7 +77,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     0x00 => {
                         core.reg_file[instr.rd as usize] =
                             (u64::from(core.reg_file[instr.rs1 as usize] as u32)
-                                << (core.reg_file[instr.rs2 as usize] as u32).min(31))
+                                << (core.reg_file[instr.rs2 as usize] as u32 & 31))
                                 as i32;
                     }
                     //mulh
@@ -98,7 +94,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     0x00 => {
                         core.reg_file[instr.rd as usize] =
                             (u64::from(core.reg_file[instr.rs1 as usize] as u32)
-                                >> (core.reg_file[instr.rs2 as usize] as u32).min(31))
+                                >> (core.reg_file[instr.rs2 as usize] as u32 & 31))
                                 as i32;
                     }
                     //divu
@@ -169,7 +165,8 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
             {
                 Ok(x) => tmp = x as i32,
                 Err(x) => {
-                    core.trap = x as i32;
+                    core.trap = x;
+                    core.is_trap = true;
                     return Ok(State::Ok);
                 }
             };
@@ -327,7 +324,8 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                     match core.memory.get_byte(addr) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i8),
                         Err(x) => {
-                            core.trap = x as i32;
+                            core.trap = x;
+                            core.is_trap = true;
                             return Ok(State::Ok);
                         }
                     };
@@ -337,7 +335,8 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                     match core.memory.get_hword(addr) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i16),
                         Err(x) => {
-                            core.trap = x as i32;
+                            core.trap = x;
+                            core.is_trap = true;
                             return Ok(State::Ok);
                         }
                     };
@@ -348,7 +347,8 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(x) => {
                             println!("yo errro {:?}", x);
-                            core.trap = x as i32;
+                            core.trap = x;
+                            core.is_trap = true;
                             return Ok(State::Ok);
                         }
                     };
@@ -358,7 +358,8 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                     match core.memory.get_byte(addr) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(x) => {
-                            core.trap = x as i32;
+                            core.trap = x;
+                            core.is_trap = true;
                             return Ok(State::Ok);
                         }
                     };
@@ -368,7 +369,8 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                     match core.memory.get_hword(addr) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(x) => {
-                            core.trap = x as i32;
+                            core.trap = x;
+                            core.is_trap = true;
                             return Ok(State::Ok);
                         }
                     };
@@ -392,41 +394,42 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
         }
         0b1110011 => {
             let imm = (instr.imm & 4095) as usize;
+            let tmp = core.reg_file[instr.rs1 as usize] as u32;
             match instr.funct3 {
-                // csr_filerw
+                // csrrw
                 0b001 => {
                     core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] = core.reg_file[instr.rs1 as usize] as u32;
+                    core.csr_file[imm] = tmp;
                     core.pc += 4;
                 }
-                // csr_filers
+                // csrrs
                 0b010 => {
                     core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] |= core.reg_file[instr.rs1 as usize] as u32;
+                    core.csr_file[imm] |= tmp;
                     core.pc += 4;
                 }
-                // csr_filerc
+                // csrrc
                 0b011 => {
                     core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] &= !core.reg_file[instr.rs1 as usize] as u32;
+                    core.csr_file[imm] &= !tmp;
                     core.pc += 4;
                 }
-                // csr_filerwi
+                // csrrwi
                 0b101 => {
                     core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] = instr.rs1;
+                    core.csr_file[imm] = tmp;
                     core.pc += 4;
                 }
-                // csr_filersi
+                // csrrsi
                 0b110 => {
                     core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] |= instr.rs1;
+                    core.csr_file[imm] |= tmp;
                     core.pc += 4;
                 }
-                // csr_filerci
+                // csrrci
                 0b111 => {
                     core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] &= !instr.rs1;
+                    core.csr_file[imm] &= !tmp;
                     core.pc += 4;
                 }
                 0b0 => {
@@ -436,15 +439,18 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                             if core.mode == 3 {
                                 // machine ecall
                                 core.trap = 11;
+                                core.is_trap = true;
                             } else {
                                 // user ecall
                                 core.trap = 8;
+                                core.is_trap = true;
                             }
                             core.pc += 4;
                         }
                         //ebreak
                         0b1 => {
                             core.trap = 3;
+                            core.is_trap = true;
                             core.pc += 4;
                         }
                         // mret
@@ -489,8 +495,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
 pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
     // if addr == 0x10000000 && core.reg_file[instr.rs2 as usize] as u8 as char == '[' {
-    //     // core.print_reg_file();
-    //     println!("{}", core.print_reg_file());
+    //     println!("{}: {}", core.intr_count, core.print_reg_file());
     // }
     let x = match instr.funct3 {
         //sb
@@ -509,7 +514,10 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
     };
     match x {
         Ok(_) => core.pc += 4,
-        Err(x) => core.trap = x as i32,
+        Err(x) => {
+            core.trap = x;
+            core.is_trap = true;
+        }
     }
     Ok(State::Ok)
 }

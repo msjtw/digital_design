@@ -24,7 +24,7 @@ impl Default for Memory {
             data: vec![0; super::RAM_SIZE],
             memory_size: super::RAM_OFFSET + super::RAM_SIZE as u32,
 
-            mtime: 0,
+            mtime: 3,
             mtimeh: 0,
             mtimecmp: 0,
             mtimecmph: 0,
@@ -101,7 +101,6 @@ impl Memory {
                     self.mtimecmph = data;
                 }
                 0x11004000 => {
-                    println!("----> {}", data);
                     self.mtimecmp = data;
                 }
                 _ => {}

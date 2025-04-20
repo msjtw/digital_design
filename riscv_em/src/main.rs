@@ -6,7 +6,7 @@ use std::process;
 
 const RAM_SIZE: usize = 64 * (1 << 20);
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = false;
+const DEBUG: bool = true;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 break;
             }
         }
-        if DEBUG && last_cycle > 3243639 {
+        if DEBUG && last_cycle > 3400000 {
             break;
         }
     }

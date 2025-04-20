@@ -70,7 +70,8 @@ pub struct Core<'a> {
     pub memory: &'a mut memory::Memory,
 
     pub intr_count: u64,
-    trap: i32,
+    trap: u32,
+    is_trap: bool,
     lr_address: u32,
     lr_valid: bool,
     mode: u32,
@@ -87,7 +88,8 @@ impl<'a> Core<'a> {
 
             intr_count: 0,
 
-            trap: -1,
+            trap: 0,
+            is_trap: false,
             lr_address: 0,
             lr_valid: false,
             mode: 0,
@@ -165,6 +167,9 @@ impl<'a> Core<'a> {
 
     pub fn exec(&mut self, last_op_time: u64) -> Result<State, ExecError> {
         self.intr_count += 1;
+        if super::DEBUG {
+            print!("|");
+        }
 
         let mtime = self.memory.csr_read(memory::Csr::Mtime) + last_op_time;
         self.memory.csr_write(memory::Csr::Mtime, mtime).unwrap();
@@ -187,12 +192,14 @@ impl<'a> Core<'a> {
             // Global interrupt enabled
             if ((*self.csr(Csr::Mie) & 1 << 7) & (*self.csr(Csr::Mip) & 1 << 7)) != 0 {
                 // machine timer interrupt
-                self.trap = 0x80000007u32 as i32;
+                self.trap = 0x80000007;
+                self.is_trap = true;
             }
         } else {
             if self.pc & 0b11 > 0 {
                 // check instruction address aligment
                 self.trap = 0;
+                self.is_trap = true;
             } else {
                 if *self.csr(Csr::Cycle) == u32::MAX {
                     *self.csr(Csr::Cycleh) += 1;
@@ -232,6 +239,7 @@ impl<'a> Core<'a> {
                             Err(ExecError::InstructionError(InstructionError::NoInstruction))
                             | Err(ExecError::InstructionError(InstructionError::NotSupported)) => {
                                 self.trap = 2;
+                                self.is_trap = true;
                             }
                             Err(x) => return Err(x),
                         };
@@ -240,12 +248,14 @@ impl<'a> Core<'a> {
                     Err(_) => {
                         // Instruction access fault
                         self.trap = 1;
+                        self.is_trap = true;
                     }
                 }
             }
         }
 
-        if self.trap >= 0 {
+        if self.is_trap {
+            print!("o {:x} ", self.trap);
             if self.trap & 1 << 31 != 0 {
                 // interrupt
                 *self.csr(Csr::Mcause) = self.trap as u32;
@@ -276,7 +286,8 @@ impl<'a> Core<'a> {
             // enter machine mode
             self.mode = 3;
             // clear trap
-            self.trap = -1;
+            self.trap = 0;
+            self.is_trap = false;
         }
 
         Ok(State::Ok)
