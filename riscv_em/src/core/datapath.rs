@@ -158,6 +158,8 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
             core.pc += 4;
         }
         0b0101111 => {
+            let rs2 = core.reg_file[instr.rs2 as usize];
+            let res;
             let tmp;
             match core
                 .memory
@@ -170,6 +172,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     return Ok(State::Ok);
                 }
             };
+            core.reg_file[instr.rd as usize] = tmp;
             match instr.funct5 {
                 // LR.W
                 0b00010 => {
@@ -199,50 +202,57 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                 }
                 // amoswap.w
                 0b00001 => {
-                    core.reg_file[instr.rd as usize] = tmp;
-                    core.reg_file.swap(instr.rd as usize, instr.rs2 as usize);
+                    // core.reg_file[instr.rd as usize] = tmp;
+                    // core.reg_file.swap(instr.rd as usize, instr.rs2 as usize);
+                    res = tmp.min(rs2);
                 }
                 // amoadd.w
                 0b00000 => {
-                    core.reg_file[instr.rd as usize] = tmp + core.reg_file[instr.rs2 as usize];
+                    // core.reg_file[instr.rd as usize] = tmp + rs2;
+                    res = tmp + rs2;
                 }
                 // amoxor.w
                 0b00100 => {
-                    core.reg_file[instr.rd as usize] = tmp ^ core.reg_file[instr.rs2 as usize];
+                    // core.reg_file[instr.rd as usize] = tmp ^ core.reg_file[instr.rs2 as usize];
+                    res = tmp ^ rs2;
                 }
                 // amoand.w
                 0b01100 => {
-                    core.reg_file[instr.rd as usize] = tmp & core.reg_file[instr.rs2 as usize];
+                    // core.reg_file[instr.rd as usize] = tmp & core.reg_file[instr.rs2 as usize];
+                    res = tmp & rs2;
                 }
                 // amoor.w
                 0b01000 => {
                     // println!("co {:b} | {:b}", tmp, core.reg_file[instr.rs2 as usize]);
-                    core.reg_file[instr.rd as usize] = tmp | core.reg_file[instr.rs2 as usize];
+                    // core.reg_file[instr.rd as usize] = tmp | core.reg_file[instr.rs2 as usize];
+                    res = tmp | rs2;
                 }
                 //amomin.w
                 0b10000 => {
-                    core.reg_file[instr.rd as usize] = tmp.min(core.reg_file[instr.rs2 as usize]);
+                    // core.reg_file[instr.rd as usize] = tmp.min(core.reg_file[instr.rs2 as usize]);
+                    res = tmp.min(rs2);
                 }
                 // amomax.w
                 0b10100 => {
-                    core.reg_file[instr.rd as usize] = tmp.max(core.reg_file[instr.rs2 as usize]);
+                    // core.reg_file[instr.rd as usize] = tmp.max(core.reg_file[instr.rs2 as usize]);
+                    res = tmp.max(rs2);
                 }
                 // amominu.w
                 0b11000 => {
-                    core.reg_file[instr.rd as usize] =
-                        (tmp as u32).min(core.reg_file[instr.rs2 as usize] as u32) as i32;
+                    // core.reg_file[instr.rd as usize] =
+                    //     (tmp as u32).min(core.reg_file[instr.rs2 as usize] as u32) as i32;
+                    res = (tmp as u32).min(rs2 as u32) as i32;
                 }
                 // amomaxiu.w
                 0b11100 => {
-                    core.reg_file[instr.rd as usize] =
-                        (tmp as u32).max(core.reg_file[instr.rs2 as usize] as u32) as i32;
+                    // core.reg_file[instr.rd as usize] =
+                    //     (tmp as u32).max(core.reg_file[instr.rs2 as usize] as u32) as i32;
+                    res = (tmp as u32).max(rs2 as u32) as i32;
                 }
                 _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
             }
-            core.memory.insert_word(
-                core.reg_file[instr.rs1 as usize] as u32,
-                core.reg_file[instr.rd as usize] as u32,
-            );
+            core.memory
+                .insert_word(core.reg_file[instr.rs1 as usize] as u32, res as u32);
             core.pc += 4;
         }
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
@@ -417,19 +427,19 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                 // csrrwi
                 0b101 => {
                     core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] = tmp;
+                    core.csr_file[imm] = instr.rs1;
                     core.pc += 4;
                 }
                 // csrrsi
                 0b110 => {
                     core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] |= tmp;
+                    core.csr_file[imm] |= instr.rs1;
                     core.pc += 4;
                 }
                 // csrrci
                 0b111 => {
                     core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] &= !tmp;
+                    core.csr_file[imm] &= !instr.rs1;
                     core.pc += 4;
                 }
                 0b0 => {
@@ -454,11 +464,12 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                             core.pc += 4;
                         }
                         // mret
-                        0b0011000 => {
+                        0b001100000010 => {
                             // restore last mode and save current
+                            let tmp = core.mode;
                             core.mode = (*core.csr(super::Csr::Mstatus) >> 11) & 0b11;
-                            *core.csr(super::Csr::Mstatus) &= !0b11 << 11;
-                            *core.csr(super::Csr::Mstatus) |= core.mode << 11;
+                            *core.csr(super::Csr::Mstatus) &= !(0b11 << 11);
+                            *core.csr(super::Csr::Mstatus) |= tmp << 11;
                             // restore mie and set mpie to 1
                             *core.csr(super::Csr::Mstatus) &= !0b1000;
                             *core.csr(super::Csr::Mstatus) |=
@@ -466,6 +477,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                             *core.csr(super::Csr::Mstatus) |= 1 << 7;
                             // restore pc
                             core.pc = *core.csr(super::Csr::Mepc);
+                            // core.pc += 4;
                         }
                         // wfi
                         0b000100000101 => {
@@ -495,8 +507,12 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
 pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
     // if addr == 0x10000000 && core.reg_file[instr.rs2 as usize] as u8 as char == '[' {
-    //     println!("{}: {}", core.intr_count, core.print_reg_file());
+    //     println!("{}", core.intr_count);
     // }
+
+    if addr == 0x80229408 {
+        println!("----->{}", core.intr_count);
+    }
     let x = match instr.funct3 {
         //sb
         0x0 => core

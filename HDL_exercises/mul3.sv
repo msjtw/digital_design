@@ -1,3 +1,4 @@
+//multiplies sequential data by 3
 module mul3 (
     input  logic clk,
     input  logic data,

@@ -38,6 +38,7 @@ impl Memory {
         //     println!("{}", addr & 0b11);
         //     return Err(4);
         // }
+
         if addr < self.base_addr || addr > self.memory_size {
             return match addr {
                 0x10000000 => Ok(0), // TODO: UART
@@ -85,6 +86,7 @@ impl Memory {
         // if addr & 0b11 > 0 {
         //     return Err(6);
         // }
+
         if addr < self.base_addr {
             match addr {
                 0x10000000 => {

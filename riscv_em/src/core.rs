@@ -188,13 +188,14 @@ impl<'a> Core<'a> {
         }
 
         let mut rd = 0;
-        if (*self.csr(Csr::Mstatus) & 1 << 3) != 0 {
-            // Global interrupt enabled
-            if ((*self.csr(Csr::Mie) & 1 << 7) & (*self.csr(Csr::Mip) & 1 << 7)) != 0 {
-                // machine timer interrupt
-                self.trap = 0x80000007;
-                self.is_trap = true;
-            }
+        // Global interrupt enabled
+        if (*self.csr(Csr::Mstatus) & 1 << 3) != 0
+            && (*self.csr(Csr::Mie) & 1 << 7) != 0
+            && (*self.csr(Csr::Mip) & 1 << 7) != 0
+        {
+            // machine timer interrupt
+            self.trap = 0x80000007;
+            self.is_trap = true;
         } else {
             if self.pc & 0b11 > 0 {
                 // check instruction address aligment
@@ -210,7 +211,13 @@ impl<'a> Core<'a> {
                 let memory_result = self.memory.get_word(self.pc);
                 if super::DEBUG {
                     println!("{}", self.print_reg_file());
-                    println!("{:?}: {:?}", self.pc, memory_result.unwrap());
+                    println!(
+                        "mstatus:{} {:x} {:?}: {:?}",
+                        self.csr_file[0x300],
+                        mtimecmp.max(mtime) - mtime,
+                        self.pc,
+                        memory_result.unwrap()
+                    );
                 }
                 match memory_result {
                     Ok(byte_code) => {
@@ -240,6 +247,7 @@ impl<'a> Core<'a> {
                             | Err(ExecError::InstructionError(InstructionError::NotSupported)) => {
                                 self.trap = 2;
                                 self.is_trap = true;
+                                println!("-->{:?}<--", byte_code);
                             }
                             Err(x) => return Err(x),
                         };
@@ -255,7 +263,9 @@ impl<'a> Core<'a> {
         }
 
         if self.is_trap {
-            print!("o {:x} ", self.trap);
+            if super::DEBUG {
+                print!("o {:x} ", self.trap);
+            }
             if self.trap & 1 << 31 != 0 {
                 // interrupt
                 *self.csr(Csr::Mcause) = self.trap as u32;
@@ -272,11 +282,10 @@ impl<'a> Core<'a> {
             }
 
             // save mode into mpp
-            *self.csr(Csr::Mstatus) &= !0b11 << 11;
-            *self.csr(Csr::Mstatus) |= self.mode << 11;
+            let mode = (self.mode & 0b11) << 11;
             // save mie into mpie
-            *self.csr(Csr::Mstatus) &= !0b1 << 7;
-            *self.csr(Csr::Mstatus) |= (*self.csr(Csr::Mstatus) & 1 << 3) << 4;
+            let mie = (*self.csr(Csr::Mstatus) & (1 << 3)) << 4;
+            *self.csr(Csr::Mstatus) = mode | mie;
 
             // save pc
             *self.csr(Csr::Mepc) = self.pc;
