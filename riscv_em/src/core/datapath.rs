@@ -39,8 +39,12 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     }
                     //div
                     0x01 => {
-                        core.reg_file[instr.rd as usize] =
-                            core.reg_file[instr.rs1 as usize] / core.reg_file[instr.rs2 as usize];
+                        if instr.rs2 == 0 {
+                            core.reg_file[instr.rd as usize] = 0xffffffffu32 as i32;
+                        } else {
+                            core.reg_file[instr.rd as usize] = core.reg_file[instr.rs1 as usize]
+                                / core.reg_file[instr.rs2 as usize];
+                        }
                     }
                     _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
                 },
@@ -158,8 +162,9 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
             core.pc += 4;
         }
         0b0101111 => {
+            let mut write = true;
             let rs2 = core.reg_file[instr.rs2 as usize];
-            let res;
+            let mut res = 0;
             let tmp;
             match core
                 .memory
@@ -179,26 +184,20 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                     core.reg_file[instr.rd as usize] = tmp;
                     core.lr_address = core.reg_file[instr.rs1 as usize] as u32;
                     core.lr_valid = true;
-                    core.pc += 4;
-                    return Ok(State::Ok);
+                    write = false;
                 }
                 // SC.W
                 0b00011 => {
                     if core.lr_valid
                         && (core.lr_address == core.reg_file[instr.rs1 as usize] as u32)
                     {
-                        core.memory.insert_word(
-                            core.reg_file[instr.rs1 as usize] as u32,
-                            core.reg_file[instr.rs2 as usize] as u32,
-                        );
+                        res = rs2;
                         core.reg_file[instr.rd as usize] = 0;
                     } else {
+                        write = false;
                         core.reg_file[instr.rd as usize] = 1;
                     }
-                    core.lr_address = 0;
                     core.lr_valid = false;
-                    core.pc += 4;
-                    return Ok(State::Ok);
                 }
                 // amoswap.w
                 0b00001 => {
@@ -209,6 +208,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                 // amoadd.w
                 0b00000 => {
                     // core.reg_file[instr.rd as usize] = tmp + rs2;
+                    println!("{} + {}", tmp, rs2);
                     res = tmp + rs2;
                 }
                 // amoxor.w
@@ -251,8 +251,11 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                 }
                 _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
             }
-            core.memory
-                .insert_word(core.reg_file[instr.rs1 as usize] as u32, res as u32);
+            if write {
+                // println!("-->{}", res);
+                core.memory
+                    .insert_word(core.reg_file[instr.rs1 as usize] as u32, res as u32);
+            }
             core.pc += 4;
         }
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
@@ -506,13 +509,14 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
 
 pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
+
     // if addr == 0x10000000 && core.reg_file[instr.rs2 as usize] as u8 as char == '[' {
     //     println!("{}", core.intr_count);
     // }
 
-    if addr == 0x80229408 {
-        println!("----->{}", core.intr_count);
-    }
+    // if addr == 0x80229408 {
+    //     println!("----->{}", core.intr_count);
+    // }
     let x = match instr.funct3 {
         //sb
         0x0 => core

@@ -24,7 +24,7 @@ impl Default for Memory {
             data: vec![0; super::RAM_SIZE],
             memory_size: super::RAM_OFFSET + super::RAM_SIZE as u32,
 
-            mtime: 3,
+            mtime: 0,
             mtimeh: 0,
             mtimecmp: 0,
             mtimecmph: 0,
