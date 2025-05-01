@@ -4,9 +4,10 @@ use std::env;
 use std::error::Error;
 use std::process;
 
-const RAM_SIZE: usize = 64 * (1 << 20);
+const RAM_SIZE: usize = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = true;
+const DEBUG: bool = false;
+const PRINT_START: u64 = 32082544;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -25,17 +26,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     let mut last_cycle: u64 = 0;
+    let mut watch;
     loop {
         let curr_cycle =
             ((*proc.csr(core::Csr::Cycleh) as u64) << 32) + (*proc.csr(core::Csr::Cycle) as u64);
         let diff_cycle = curr_cycle - last_cycle;
         last_cycle = curr_cycle;
 
+        watch = proc.memory.get_word(0x83f83c9c);
+
         match proc.exec(diff_cycle) {
             Ok(x) => match x {
                 core::State::Ok => {}
                 core::State::Sleep => {
-                    println!("sleeeeeeeeep");
+                    // println!("sleeeeeeeeep");
                 }
                 core::State::Reboot => {
                     println!("Shutting down...");
@@ -51,7 +55,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 break;
             }
         }
-        if DEBUG && last_cycle > 25279333 {
+        // if DEBUG && watch != proc.memory.get_word(0x83f83c9c) {
+        //     // println!("{}", proc.print_reg_file());
+        //     // println!("{} {}", last_cycle, proc.pc);
+        //     println!("{}", proc.memory.get_word(0x83f83c9c).unwrap());
+        // }
+        if DEBUG && last_cycle > 44813202 {
             break;
         }
     }

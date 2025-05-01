@@ -87,6 +87,10 @@ impl Memory {
         //     return Err(6);
         // }
 
+        // if addr == 0x83f83c9c {
+        //     println!("{}", data);
+        // }
+
         if addr < self.base_addr {
             match addr {
                 0x10000000 => {

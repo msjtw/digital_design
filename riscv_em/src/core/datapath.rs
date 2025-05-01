@@ -1,3 +1,4 @@
+use crate::DEBUG;
 use crate::core::Core;
 use crate::core::instr_parse::{BType, IType, InstructionError, JType, RType, SType, UType};
 
@@ -163,35 +164,31 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
         }
         0b0101111 => {
             let mut write = true;
+            let mut write_val = 0;
+            let addr = core.reg_file[instr.rs1 as usize] as u32;
             let rs2 = core.reg_file[instr.rs2 as usize];
-            let mut res = 0;
-            let tmp;
-            match core
-                .memory
-                .get_word(core.reg_file[instr.rs1 as usize] as u32)
-            {
-                Ok(x) => tmp = x as i32,
+            let rd;
+            match core.memory.get_word(addr) {
+                Ok(x) => rd = x as i32,
                 Err(x) => {
                     core.trap = x;
                     core.is_trap = true;
                     return Ok(State::Ok);
                 }
             };
-            core.reg_file[instr.rd as usize] = tmp;
+            core.reg_file[instr.rd as usize] = rd;
             match instr.funct5 {
                 // LR.W
                 0b00010 => {
-                    core.reg_file[instr.rd as usize] = tmp;
-                    core.lr_address = core.reg_file[instr.rs1 as usize] as u32;
+                    core.reg_file[instr.rd as usize] = rd;
+                    core.lr_address = addr;
                     core.lr_valid = true;
                     write = false;
                 }
                 // SC.W
                 0b00011 => {
-                    if core.lr_valid
-                        && (core.lr_address == core.reg_file[instr.rs1 as usize] as u32)
-                    {
-                        res = rs2;
+                    if core.lr_valid && (core.lr_address == addr) {
+                        write_val = rs2;
                         core.reg_file[instr.rd as usize] = 0;
                     } else {
                         write = false;
@@ -203,58 +200,59 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                 0b00001 => {
                     // core.reg_file[instr.rd as usize] = tmp;
                     // core.reg_file.swap(instr.rd as usize, instr.rs2 as usize);
-                    res = tmp.min(rs2);
+                    write_val = rs2;
                 }
                 // amoadd.w
                 0b00000 => {
                     // core.reg_file[instr.rd as usize] = tmp + rs2;
-                    println!("{} + {}", tmp, rs2);
-                    res = tmp + rs2;
+                    // println!("{} + {}", tmp, rs2);
+                    write_val = rd + rs2;
                 }
                 // amoxor.w
                 0b00100 => {
-                    // core.reg_file[instr.rd as usize] = tmp ^ core.reg_file[instr.rs2 as usize];
-                    res = tmp ^ rs2;
+                    // core.reg_file[instr.rd as usize] = rd ^ core.reg_file[instr.rs2 as usize];
+                    write_val = rd ^ rs2;
                 }
                 // amoand.w
                 0b01100 => {
-                    // core.reg_file[instr.rd as usize] = tmp & core.reg_file[instr.rs2 as usize];
-                    res = tmp & rs2;
+                    // core.reg_file[instr.rd as usize] = rd & core.reg_file[instr.rs2 as usize];
+                    write_val = rd & rs2;
                 }
                 // amoor.w
                 0b01000 => {
-                    // println!("co {:b} | {:b}", tmp, core.reg_file[instr.rs2 as usize]);
-                    // core.reg_file[instr.rd as usize] = tmp | core.reg_file[instr.rs2 as usize];
-                    res = tmp | rs2;
+                    // println!("co {:b} | {:b}", rd, core.reg_file[instr.rs2 as usize]);
+                    // core.reg_file[instr.rd as usize] = rd | core.reg_file[instr.rs2 as usize];
+                    write_val = rd | rs2;
                 }
                 //amomin.w
                 0b10000 => {
-                    // core.reg_file[instr.rd as usize] = tmp.min(core.reg_file[instr.rs2 as usize]);
-                    res = tmp.min(rs2);
+                    // core.reg_file[instr.rd as usize] = rd.min(core.reg_file[instr.rs2 as usize]);
+                    write_val = rd.min(rs2);
                 }
                 // amomax.w
                 0b10100 => {
-                    // core.reg_file[instr.rd as usize] = tmp.max(core.reg_file[instr.rs2 as usize]);
-                    res = tmp.max(rs2);
+                    // core.reg_file[instr.rd as usize] = rd.max(core.reg_file[instr.rs2 as usize]);
+                    write_val = rd.max(rs2);
                 }
                 // amominu.w
                 0b11000 => {
                     // core.reg_file[instr.rd as usize] =
-                    //     (tmp as u32).min(core.reg_file[instr.rs2 as usize] as u32) as i32;
-                    res = (tmp as u32).min(rs2 as u32) as i32;
+                    //     (rd as u32).min(core.reg_file[instr.rs2 as usize] as u32) as i32;
+                    write_val = (rd as u32).min(rs2 as u32) as i32;
                 }
                 // amomaxiu.w
                 0b11100 => {
                     // core.reg_file[instr.rd as usize] =
-                    //     (tmp as u32).max(core.reg_file[instr.rs2 as usize] as u32) as i32;
-                    res = (tmp as u32).max(rs2 as u32) as i32;
+                    //     (rd as u32).max(core.reg_file[instr.rs2 as usize] as u32) as i32;
+                    write_val = (rd as u32).max(rs2 as u32) as i32;
                 }
                 _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
             }
             if write {
-                // println!("-->{}", res);
-                core.memory
-                    .insert_word(core.reg_file[instr.rs1 as usize] as u32, res as u32);
+                if super::super::DEBUG {
+                    // println!("-->{}", write_val);
+                }
+                core.memory.insert_word(addr, write_val as u32);
             }
             core.pc += 4;
         }
@@ -458,7 +456,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                                 core.trap = 8;
                                 core.is_trap = true;
                             }
-                            core.pc += 4;
+                            // core.pc += 4;
                         }
                         //ebreak
                         0b1 => {

@@ -167,9 +167,9 @@ impl<'a> Core<'a> {
 
     pub fn exec(&mut self, last_op_time: u64) -> Result<State, ExecError> {
         self.intr_count += 1;
-        if super::DEBUG {
-            print!("|");
-        }
+        // if super::DEBUG {
+        //     print!("|");
+        // }
 
         let mtime = self.memory.csr_read(memory::Csr::Mtime) + last_op_time;
         self.memory.csr_write(memory::Csr::Mtime, mtime).unwrap();
@@ -209,7 +209,7 @@ impl<'a> Core<'a> {
                     *self.csr(Csr::Cycle) += 1;
                 }
                 let memory_result = self.memory.get_word(self.pc);
-                if super::DEBUG {
+                if super::DEBUG && self.memory.csr_read(memory::Csr::Mtime) > super::PRINT_START {
                     println!("{}", self.print_reg_file());
                     println!(
                         "mstatus:{} {:x} {:?}: {:?}",
