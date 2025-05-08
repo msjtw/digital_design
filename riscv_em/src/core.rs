@@ -219,47 +219,43 @@ impl<'a> Core<'a> {
                         memory_result.unwrap()
                     );
                 }
-                match memory_result {
-                    Ok(byte_code) => {
-                        let instr = Instruction::from(byte_code)?;
-                        let ret = match instr {
-                            Instruction::R(x) => {
-                                rd = x.rd;
-                                datapath::exec_r(self, &x)
-                            }
-                            Instruction::I(x) => {
-                                rd = x.rd;
-                                datapath::exec_i(self, &x)
-                            }
-                            Instruction::U(x) => {
-                                rd = x.rd;
-                                datapath::exec_u(self, &x)
-                            }
-                            Instruction::J(x) => {
-                                rd = x.rd;
-                                datapath::exec_j(self, &x)
-                            }
-                            Instruction::S(x) => datapath::exec_s(self, &x),
-                            Instruction::B(x) => datapath::exec_b(self, &x),
-                        };
-                        match ret {
-                            Ok(State::Sleep) => return Ok(State::Sleep),
-                            Ok(_) => {}
-                            Err(ExecError::InstructionError(InstructionError::NoInstruction))
-                            | Err(ExecError::InstructionError(InstructionError::NotSupported)) => {
-                                self.trap = 2;
-                                self.is_trap = true;
-                                println!("-->{:?}<--", byte_code);
-                            }
-                            Err(x) => return Err(x),
-                        };
-                        self.reg_file[0] = 0;
-                    }
-                    Err(_) => {
-                        // Instruction access fault
-                        self.trap = 1;
-                        self.is_trap = true;
-                    }
+                if let Ok(byte_code) = memory_result {
+                    let instr = Instruction::from(byte_code)?;
+                    let ret = match instr {
+                        Instruction::R(x) => {
+                            rd = x.rd;
+                            datapath::exec_r(self, &x)
+                        }
+                        Instruction::I(x) => {
+                            rd = x.rd;
+                            datapath::exec_i(self, &x)
+                        }
+                        Instruction::U(x) => {
+                            rd = x.rd;
+                            datapath::exec_u(self, &x)
+                        }
+                        Instruction::J(x) => {
+                            rd = x.rd;
+                            datapath::exec_j(self, &x)
+                        }
+                        Instruction::S(x) => datapath::exec_s(self, &x),
+                        Instruction::B(x) => datapath::exec_b(self, &x),
+                    };
+                    match ret {
+                        Ok(State::Ok) => {}
+                        Ok(x) => return Ok(x),
+                        Err(ExecError::InstructionError(InstructionError::NoInstruction))
+                        | Err(ExecError::InstructionError(InstructionError::NotSupported)) => {
+                            self.trap = 2;
+                            self.is_trap = true;
+                        }
+                        Err(x) => return Err(x),
+                    };
+                    self.reg_file[0] = 0;
+                } else {
+                    // Instruction access fault
+                    self.trap = 1;
+                    self.is_trap = true;
                 }
             }
         }

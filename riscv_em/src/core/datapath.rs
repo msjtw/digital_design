@@ -492,14 +492,28 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
     let rs2 = core.reg_file[instr.rs2 as usize];
     let x = match instr.funct3 {
         //sb
-        0x0 => core.memory.insert_byte(addr, rs2 as u8),
+        0x0 => match core.memory.insert_byte(addr, rs2 as u8) {
+            Ok(_) => Ok(0),
+            Err(x) => Err(x),
+        },
         //sh
-        0x1 => core.memory.insert_hword(addr, rs2 as u16),
+        0x1 => match core.memory.insert_hword(addr, rs2 as u16) {
+            Ok(_) => Ok(0),
+            Err(x) => Err(x),
+        },
         //sw
         0x2 => core.memory.insert_word(addr, rs2 as u32),
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     match x {
+        Ok(0x7777) => {
+            core.pc += 4;
+            return Ok(State::Reboot);
+        }
+        Ok(0x5555) => {
+            core.pc += 4;
+            return Ok(State::Shutdown);
+        }
         Ok(_) => core.pc += 4,
         Err(x) => {
             core.trap = x;

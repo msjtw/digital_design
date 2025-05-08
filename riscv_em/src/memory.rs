@@ -54,36 +54,31 @@ impl Memory {
                 0x1100bff8 => Ok(self.mtime),
                 0x11004004 => Ok(self.mtimecmph),
                 0x11004000 => Ok(self.mtimecmp),
-                _ => {
-                    println!("co jest kurde noc jest kurde");
-                    Ok(0)
-                }
+                _ => Ok(0),
             };
         }
-        let mut address = (addr - self.base_addr) as usize;
+        let address = (addr - self.base_addr) as usize;
         let d = self.data[address] as u32;
-        address += 1;
-        let c = self.data[address] as u32;
-        address += 1;
-        let b = self.data[address] as u32;
-        address += 1;
-        let a = self.data[address] as u32;
+        let c = self.data[address + 1] as u32;
+        let b = self.data[address + 2] as u32;
+        let a = self.data[address + 3] as u32;
         Ok((a << 24) + (b << 16) + (c << 8) + d)
     }
     pub fn get_hword(&self, addr: u32) -> Result<u16, u32> {
         // if addr & 0b1 > 0 {
         //     return Err(4);
         // }
-        let mut address = (addr - self.base_addr) as usize;
+        let address = (addr - self.base_addr) as usize;
         let b = self.data[address] as u16;
-        address += 1;
-        let a = self.data[address] as u16;
+        let a = self.data[address + 1] as u16;
         Ok((a << 8) + b)
     }
     pub fn get_byte(&mut self, addr: u32) -> Result<u8, u32> {
         if addr < self.base_addr || addr > self.memory_size {
             return match addr {
-                0x10000000 => Ok(self.read_byte), // TODO: UART
+                // read uart byte
+                0x10000000 => Ok(self.read_byte),
+                // check if there is something to read
                 0x10000005 => {
                     let mut bytes_to_read = 0;
                     if let Some(Ok(byte)) = self.stdin.next() {
@@ -92,7 +87,7 @@ impl Memory {
                     }
                     let ret = 0x60 | bytes_to_read;
                     Ok(ret)
-                } // TODO: UART
+                }
                 _ => Ok(0),
             };
         }
@@ -100,14 +95,17 @@ impl Memory {
         Ok(self.data[address])
     }
 
-    pub fn insert_word(&mut self, addr: u32, data: u32) -> Result<(), u32> {
+    pub fn insert_word(&mut self, addr: u32, data: u32) -> Result<u32, u32> {
         // if addr & 0b11 > 0 {
         //     return Err(6);
         // }
 
         if addr < self.base_addr {
             match addr {
-                0x11100000 => {} // TODO: SYSCON;
+                // syscon
+                0x11100000 => {
+                    return Ok(data);
+                }
                 0x1100bffc => {
                     self.mtimeh = data;
                 }
@@ -122,22 +120,19 @@ impl Memory {
                 }
                 _ => {}
             };
-            return Ok(());
+            return Ok(0);
         }
         let address = (addr - self.base_addr) as usize;
-        let mut mask: u32 = (1 << 8) - 1;
+        let mask: u32 = (1 << 8) - 1;
         let d: u8 = (data & mask) as u8;
-        mask <<= 8;
-        let c: u8 = ((data & mask) >> 8) as u8;
-        mask <<= 8;
-        let b: u8 = ((data & mask) >> 16) as u8;
-        mask <<= 8;
-        let a: u8 = ((data & mask) >> 24) as u8;
+        let c: u8 = ((data & mask << 8) >> 8) as u8;
+        let b: u8 = ((data & mask << 16) >> 16) as u8;
+        let a: u8 = ((data & mask << 24) >> 24) as u8;
         self.data[address] = d;
         self.data[address + 1] = c;
         self.data[address + 2] = b;
         self.data[address + 3] = a;
-        Ok(())
+        Ok(0)
     }
     pub fn insert_hword(&mut self, addr: u32, data: u16) -> Result<(), u32> {
         // if addr & 0b1 > 0 {
@@ -147,10 +142,9 @@ impl Memory {
             return Err(7);
         }
         let address = (addr - self.base_addr) as usize;
-        let mut mask: u16 = (2 << 8) - 1;
+        let mask: u16 = (2 << 8) - 1;
         let d: u8 = (data & mask) as u8;
-        mask <<= 8;
-        let c: u8 = ((data & mask) >> 8) as u8;
+        let c: u8 = ((data & mask << 8) >> 8) as u8;
         self.data[address] = d;
         self.data[address + 1] = c;
         Ok(())
