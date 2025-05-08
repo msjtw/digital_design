@@ -62,7 +62,7 @@ pub enum Csr {
     Mvendorid,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Core<'a> {
     pub pc: u32,
     reg_file: [i32; 32],
@@ -222,7 +222,7 @@ impl<'a> Core<'a> {
                 match memory_result {
                     Ok(byte_code) => {
                         let instr = Instruction::from(byte_code)?;
-                        match match instr {
+                        let ret = match instr {
                             Instruction::R(x) => {
                                 rd = x.rd;
                                 datapath::exec_r(self, &x)
@@ -241,7 +241,9 @@ impl<'a> Core<'a> {
                             }
                             Instruction::S(x) => datapath::exec_s(self, &x),
                             Instruction::B(x) => datapath::exec_b(self, &x),
-                        } {
+                        };
+                        match ret {
+                            Ok(State::Sleep) => return Ok(State::Sleep),
                             Ok(_) => {}
                             Err(ExecError::InstructionError(InstructionError::NoInstruction))
                             | Err(ExecError::InstructionError(InstructionError::NotSupported)) => {
@@ -264,7 +266,7 @@ impl<'a> Core<'a> {
 
         if self.is_trap {
             if super::DEBUG {
-                print!("o {:x} ", self.trap);
+                // print!("o {:x} ", self.trap);
             }
             if self.trap & 1 << 31 != 0 {
                 // interrupt
@@ -273,7 +275,7 @@ impl<'a> Core<'a> {
             } else {
                 // trap
                 *self.csr(Csr::Mcause) = self.trap as u32;
-                if self.trap > 5 && self.trap <= 8 {
+                if self.trap > 4 && self.trap <= 7 {
                     // address misaligned, access fault, ecall
                     *self.csr(Csr::Mtval) = self.reg_file[rd as usize] as u32;
                 } else {

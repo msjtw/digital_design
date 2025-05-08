@@ -1,11 +1,14 @@
+use std::io::Write;
 mod uart;
+use std::io::{Bytes, Read};
+use termion::async_stdin;
 
 pub enum Csr {
     Mtime,
     Mtimecmp,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Memory {
     base_addr: u32,
     data: Vec<u8>,
@@ -15,6 +18,9 @@ pub struct Memory {
     mtimeh: u32,
     mtimecmp: u32,
     mtimecmph: u32,
+
+    stdin: Bytes<termion::AsyncReader>,
+    read_byte: u8,
 }
 
 impl Default for Memory {
@@ -28,6 +34,9 @@ impl Default for Memory {
             mtimeh: 0,
             mtimecmp: 0,
             mtimecmph: 0,
+
+            stdin: async_stdin().bytes(),
+            read_byte: 0,
         }
     }
 }
@@ -41,13 +50,14 @@ impl Memory {
 
         if addr < self.base_addr || addr > self.memory_size {
             return match addr {
-                0x10000000 => Ok(0), // TODO: UART
-                0x10000005 => Ok(0), // TODO: UART
                 0x1100bffc => Ok(self.mtimeh),
                 0x1100bff8 => Ok(self.mtime),
                 0x11004004 => Ok(self.mtimecmph),
                 0x11004000 => Ok(self.mtimecmp),
-                _ => Ok(0),
+                _ => {
+                    println!("co jest kurde noc jest kurde");
+                    Ok(0)
+                }
             };
         }
         let mut address = (addr - self.base_addr) as usize;
@@ -70,11 +80,19 @@ impl Memory {
         let a = self.data[address] as u16;
         Ok((a << 8) + b)
     }
-    pub fn get_byte(&self, addr: u32) -> Result<u8, u32> {
+    pub fn get_byte(&mut self, addr: u32) -> Result<u8, u32> {
         if addr < self.base_addr || addr > self.memory_size {
             return match addr {
-                0x10000000 => Ok(0),          // TODO: UART
-                0x10000005 => Ok(0x00000060), // TODO: UART
+                0x10000000 => Ok(self.read_byte), // TODO: UART
+                0x10000005 => {
+                    let mut bytes_to_read = 0;
+                    if let Some(Ok(byte)) = self.stdin.next() {
+                        self.read_byte = byte;
+                        bytes_to_read = 1;
+                    }
+                    let ret = 0x60 | bytes_to_read;
+                    Ok(ret)
+                } // TODO: UART
                 _ => Ok(0),
             };
         }
@@ -87,15 +105,8 @@ impl Memory {
         //     return Err(6);
         // }
 
-        // if addr == 0x83f83c9c {
-        //     println!("{}", data);
-        // }
-
         if addr < self.base_addr {
             match addr {
-                0x10000000 => {
-                    print!("|{}", data)
-                } // TODO: UART;
                 0x11100000 => {} // TODO: SYSCON;
                 0x1100bffc => {
                     self.mtimeh = data;
@@ -148,14 +159,8 @@ impl Memory {
         if addr < self.base_addr {
             match addr {
                 0x10000000 => {
-                    // if data as char == '[' {
-                    //     println!(
-                    //         "timer: {}; timermatch {}",
-                    //         self.csr_read(Csr::Mtime),
-                    //         self.csr_read(Csr::Mtimecmp),
-                    //     );
-                    // }
-                    print!("{}", data as char)
+                    print!("{}", data as char);
+                    std::io::stdout().flush();
                 } // TODO: UART;
                 0x11100000 => {} // TODO: SYSCON;
                 _ => {}
