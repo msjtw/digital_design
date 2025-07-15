@@ -1,7 +1,9 @@
+mod csr_file;
 mod datapath;
 pub mod instr_parse;
 
-use crate::memory;
+use crate::memory::{self};
+use csr_file::{CSR_file, Csr};
 use instr_parse::{Instruction, InstructionError};
 use std::{error::Error, fmt, fs, u32};
 
@@ -46,30 +48,14 @@ impl fmt::Display for ExecError {
     }
 }
 
-#[derive(Debug)]
-pub enum Csr {
-    Mscratch,
-    Mtvec,
-    Mie,
-    Cycle,
-    Cycleh,
-    Mip,
-    Mepc,
-    Mstatus,
-    Mcause,
-    Mtval,
-    Misa,
-    Mvendorid,
-}
-
 // #[derive(Debug)]
 pub struct Core<'a> {
     pub pc: u32,
     reg_file: [i32; 32],
-    csr_file: [u32; 4096],
+    csr_file: CSR_file,
     pub memory: &'a mut memory::Memory,
 
-    pub intr_count: u64,
+    pub inst_count: u64,
     trap: u32,
     is_trap: bool,
     lr_address: u32,
@@ -80,13 +66,13 @@ pub struct Core<'a> {
 
 impl<'a> Core<'a> {
     pub fn new<'b>(memory: &'a mut memory::Memory) -> Self {
-        let c = Core {
+        Core {
             pc: 0,
             reg_file: [0; 32],
-            csr_file: [0; 4096],
+            csr_file: CSR_file::default(),
             memory,
 
-            intr_count: 0,
+            inst_count: 0,
 
             trap: 0,
             is_trap: false,
@@ -94,8 +80,7 @@ impl<'a> Core<'a> {
             lr_valid: false,
             mode: 0,
             wfi: false,
-        };
-        c
+        }
     }
 
     pub fn read_data(
@@ -122,8 +107,8 @@ impl<'a> Core<'a> {
         self.reg_file[10] = 0x00; // hart ID
         self.reg_file[11] = (super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32) as i32;
         self.mode = 3;
-        self.csr_file[0xf11] = 0xff0ff0ff; // mvendorid
-        self.csr_file[0x301] = 0x40401101; // misa
+        self.csr_file
+            .write(Csr::misa, 0b01000000000000000001000100000001, self.mode);
         Ok(())
     }
 
@@ -166,22 +151,24 @@ impl<'a> Core<'a> {
     }
 
     pub fn exec(&mut self, last_op_time: u64) -> Result<State, ExecError> {
-        self.intr_count += 1;
+        self.inst_count += 1;
         // if super::DEBUG {
         //     print!("|");
         // }
 
-        let mtime = self.memory.csr_read(memory::Csr::Mtime) + last_op_time;
-        self.memory.csr_write(memory::Csr::Mtime, mtime).unwrap();
+        let mtime = self.memory.csr_read(memory::Time::Mtime) + last_op_time;
+        self.memory.csr_write(memory::Time::Mtime, mtime).unwrap();
 
-        let mtimecmp = self.memory.csr_read(memory::Csr::Mtimecmp);
+        let mtimecmp = self.memory.csr_read(memory::Time::Mtimecmp);
 
+        let mut mip = self.csr_file.read(Csr::mip, self.mode);
         if mtime > mtimecmp {
-            *self.csr(Csr::Mip) |= 1 << 7;
+            mip |= 1 << 7;
             self.wfi = false;
         } else {
-            *self.csr(Csr::Mip) &= !(1 << 7);
+            mip &= !(1 << 7);
         }
+        self.csr_file.write(Csr::mip, mip, self.mode);
 
         if self.wfi {
             return Ok(State::Sleep);
@@ -189,10 +176,10 @@ impl<'a> Core<'a> {
 
         let mut rd = 0;
         // Global interrupt enabled
-        if (*self.csr(Csr::Mstatus) & 1 << 3) != 0
-            && (*self.csr(Csr::Mie) & 1 << 7) != 0
-            && (*self.csr(Csr::Mip) & 1 << 7) != 0
-        {
+        let mstatus = self.csr_file.read(Csr::mstatus, self.mode);
+        let mie = self.csr_file.read(Csr::mie, self.mode);
+        let mip = self.csr_file.read(Csr::mip, self.mode);
+        if (mstatus & 1 << 3) != 0 && (mie & 1 << 7) != 0 && (mip & 1 << 7) != 0 {
             // machine timer interrupt
             self.trap = 0x80000007;
             self.is_trap = true;
@@ -202,18 +189,15 @@ impl<'a> Core<'a> {
                 self.trap = 0;
                 self.is_trap = true;
             } else {
-                if *self.csr(Csr::Cycle) == u32::MAX {
-                    *self.csr(Csr::Cycleh) += 1;
-                    *self.csr(Csr::Cycle) = 0;
-                } else {
-                    *self.csr(Csr::Cycle) += 1;
-                }
+                let cycle = self.csr_file.read_mcycle();
+                self.csr_file.write_mcycle(cycle+1);
+
                 let memory_result = self.memory.get_word(self.pc);
-                if super::DEBUG && self.memory.csr_read(memory::Csr::Mtime) > super::PRINT_START {
+                if super::DEBUG && self.memory.csr_read(memory::Time::Mtime) > super::PRINT_START {
                     println!("{}", self.print_reg_file());
                     println!(
                         "mstatus:{} {:x} {:?}: {:?}",
-                        self.csr_file[0x300],
+                        self.csr_file.read(Csr::mstatus, 3),
                         mtimecmp.max(mtime) - mtime,
                         self.pc,
                         memory_result.unwrap()
@@ -261,59 +245,53 @@ impl<'a> Core<'a> {
         }
 
         if self.is_trap {
+            // Machine mode trap handler
             if super::DEBUG {
                 // print!("o {:x} ", self.trap);
             }
-            if self.trap & 1 << 31 != 0 {
+            if (self.trap as i32) < 0 {
                 // interrupt
-                *self.csr(Csr::Mcause) = self.trap as u32;
-                *self.csr(Csr::Mtval) = 0;
+                self.csr_file.write(Csr::mcause, self.trap, self.mode);
+                self.csr_file.write(Csr::mtval, 0, self.mode);
             } else {
                 // trap
-                *self.csr(Csr::Mcause) = self.trap as u32;
+                self.csr_file.write(Csr::mcause, self.trap, self.mode);
                 if self.trap > 4 && self.trap <= 7 {
                     // address misaligned, access fault, ecall
-                    *self.csr(Csr::Mtval) = self.reg_file[rd as usize] as u32;
+                    self.csr_file.write(Csr::mtval, self.reg_file[rd as usize] as u32, self.mode);
                 } else {
-                    *self.csr(Csr::Mtval) = self.pc;
+                    self.csr_file.write(Csr::mtval, self.pc, self.mode);
                 }
             }
 
+            let mstatus = self.csr_file.read(Csr::mstatus, self.mode);
             // save mode into mpp
-            let mode = (self.mode & 0b11) << 11;
+            let mpp = (self.mode & 0b11) << 11;
             // save mie into mpie
-            let mie = (*self.csr(Csr::Mstatus) & (1 << 3)) << 4;
-            *self.csr(Csr::Mstatus) = mode | mie;
+            let mpie = (mstatus & (1 << 3)) << 4;
+            // zero mpp and mpie fields
+            let mut mstatus = mstatus & !((0b11 << 11) | (0b1 << 7));
+            mstatus |= mpp;
+            mstatus |= mpie;
+            // disable interrupts
+            mstatus &= !0b1000;
+            self.csr_file.write(Csr::mstatus, mstatus, self.mode);
 
             // save pc
-            *self.csr(Csr::Mepc) = self.pc;
+            self.csr_file.write(Csr::mepc, self.pc, self.mode);
             // jump to handler
-            self.pc = *self.csr(Csr::Mtvec);
+            self.pc = self.csr_file.read(Csr::mtvec, self.mode);
 
             // enter machine mode
             self.mode = 3;
             // clear trap
             self.trap = 0;
             self.is_trap = false;
+
         }
 
         Ok(State::Ok)
     }
 
-    pub fn csr(&mut self, csrname: Csr) -> &mut u32 {
-        match csrname {
-            Csr::Mscratch => &mut self.csr_file[0x340],
-            Csr::Mtvec => &mut self.csr_file[0x305],
-            Csr::Mie => &mut self.csr_file[0x304],
-            Csr::Cycle => &mut self.csr_file[0xc00],
-            Csr::Cycleh => &mut self.csr_file[0xc80],
-            Csr::Mip => &mut self.csr_file[0x344],
-            Csr::Mepc => &mut self.csr_file[0x341],
-            Csr::Mstatus => &mut self.csr_file[0x300],
-            Csr::Mcause => &mut self.csr_file[0x342],
-            Csr::Mtval => &mut self.csr_file[0x343],
-            Csr::Mvendorid => &mut self.csr_file[0xf11],
-            Csr::Misa => &mut self.csr_file[0x301],
-        }
-    }
+
 }

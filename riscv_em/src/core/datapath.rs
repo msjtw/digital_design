@@ -386,43 +386,39 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
             core.reg_file[instr.rd as usize] = (tmp_pc + 4) as i32;
         }
         0b1110011 => {
-            let imm = (instr.imm & 4095) as usize;
+            let imm = (instr.imm & 4095) as u32;
             let tmp = core.reg_file[instr.rs1 as usize] as u32;
+            let csr = core.csr_file.read_addr(imm, core.mode);
+            core.reg_file[instr.rd as usize] = csr as i32;
             match instr.funct3 {
                 // csrrw
                 0b001 => {
-                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] = tmp;
+                    core.csr_file.write_addr(imm, tmp, core.mode);
                     core.pc += 4;
                 }
                 // csrrs
                 0b010 => {
-                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] |= tmp;
+                    core.csr_file.write_addr(imm, csr | tmp, core.mode);
                     core.pc += 4;
                 }
                 // csrrc
                 0b011 => {
-                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] &= !tmp;
+                    core.csr_file.write_addr(imm, csr & !tmp, core.mode);
                     core.pc += 4;
                 }
                 // csrrwi
                 0b101 => {
-                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] = instr.rs1;
+                    core.csr_file.write_addr(imm, instr.rs1, core.mode);
                     core.pc += 4;
                 }
                 // csrrsi
                 0b110 => {
-                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] |= instr.rs1;
+                    core.csr_file.write_addr(imm, csr | instr.rs1, core.mode);
                     core.pc += 4;
                 }
                 // csrrci
                 0b111 => {
-                    core.reg_file[instr.rd as usize] = core.csr_file[imm] as i32;
-                    core.csr_file[imm] &= !instr.rs1;
+                    core.csr_file.write_addr(imm, csr & !instr.rs1, core.mode);
                     core.pc += 4;
                 }
                 0b0 => {
@@ -433,7 +429,11 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                                 // machine ecall
                                 core.trap = 11;
                                 core.is_trap = true;
-                            } else {
+                            } else if core.mode == 1 {
+                                // supervisor ecall
+                                core.trap = 9;
+                                core.is_trap = true;
+                            } else if core.mode == 0 {
                                 // user ecall
                                 core.trap = 8;
                                 core.is_trap = true;
@@ -448,23 +448,22 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         }
                         // mret
                         0b001100000010 => {
-                            // restore last mode and save current
-                            let tmp = core.mode;
-                            core.mode = (*core.csr(super::Csr::Mstatus) >> 11) & 0b11;
-                            *core.csr(super::Csr::Mstatus) &= !(0b11 << 11);
-                            *core.csr(super::Csr::Mstatus) |= tmp << 11;
+                            let mut mstatus = core.csr_file.read(super::Csr::mstatus, core.mode);
+                            // restore last mode and set mpp = 0
+                            core.mode = (mstatus >> 11) & 0b11;
+                            mstatus &= !(0b11 << 11);
                             // restore mie and set mpie to 1
-                            *core.csr(super::Csr::Mstatus) &= !0b1000;
-                            *core.csr(super::Csr::Mstatus) |=
-                                (*core.csr(super::Csr::Mstatus) & 1 << 7) >> 4;
-                            *core.csr(super::Csr::Mstatus) |= 1 << 7;
+                            mstatus &= !0b1000;
+                            mstatus |= (mstatus & 1 << 7) >> 4;
+                            mstatus |= 1 << 7;
+                            core.csr_file.write(super::Csr::mstatus, mstatus, core.mode);
                             // restore pc
-                            core.pc = *core.csr(super::Csr::Mepc);
+                            core.pc = core.csr_file.read(super::Csr::mepc, core.mode)
                             // core.pc += 4;
                         }
                         // wfi
                         0b000100000101 => {
-                            *core.csr(super::Csr::Mstatus) |= 1 << 3;
+                            // *core.csr(super::Csr::Mstatus) |= 1 << 3;
                             core.wfi = true;
                             core.pc += 4;
                             return Ok(State::Sleep);

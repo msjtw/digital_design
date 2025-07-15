@@ -1,9 +1,8 @@
 use std::io::Write;
-mod uart;
 use std::io::{Bytes, Read};
 use termion::async_stdin;
 
-pub enum Csr {
+pub enum Time {
     Mtime,
     Mtimecmp,
 }
@@ -166,27 +165,27 @@ impl Memory {
         Ok(())
     }
 
-    pub fn csr_read(&self, csr: Csr) -> u64 {
+    pub fn csr_read(&self, csr: Time) -> u64 {
         match csr {
-            Csr::Mtime => {
+            Time::Mtime => {
                 let mtimel = self.get_word(0x1100bff8).unwrap();
                 let mtimeh = self.get_word(0x1100bffc).unwrap();
                 ((mtimeh as u64) << 32) + mtimel as u64
             }
-            Csr::Mtimecmp => {
+            Time::Mtimecmp => {
                 let mtimecmpl = self.get_word(0x11004000).unwrap();
                 let mtimecmph = self.get_word(0x11004004).unwrap();
                 ((mtimecmph as u64) << 32) + mtimecmpl as u64
             }
         }
     }
-    pub fn csr_write(&mut self, csr: Csr, val: u64) -> Result<(), u32> {
+    pub fn csr_write(&mut self, csr: Time, val: u64) -> Result<(), u32> {
         match csr {
-            Csr::Mtime => {
+            Time::Mtime => {
                 self.insert_word(0x1100bff8, val as u32)?;
                 self.insert_word(0x1100bffc, (val >> 32) as u32)?;
             }
-            Csr::Mtimecmp => {
+            Time::Mtimecmp => {
                 self.insert_word(0x11004000, val as u32)?;
                 self.insert_word(0x11004004, (val >> 32) as u32)?;
             }
