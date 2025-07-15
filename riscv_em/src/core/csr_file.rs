@@ -1,3 +1,4 @@
+#[allow(non_camel_case_types)]
 pub struct CSR_file {
     csr_file: [u32; 4096],
 
@@ -28,26 +29,102 @@ impl CSR_file {
         self.csr_file[addr as usize] = data;
     }
 
-    pub fn read_mcycle(&self) -> u64 {
-        let mcycle = self.csr_file[csr_addr(Csr::mcycle)] as u64;
-        let mcycleh = self.csr_file[csr_addr(Csr::mcycleh)] as u64;
-        (mcycleh << 32) + mcycle
+    pub fn read_64(&self, csr: Csr64) -> u64 {
+        let low: u64;
+        let high: u64;
+        match csr {
+            Csr64::time => {
+                low = self.csr_file[csr_addr(Csr::time)] as u64;
+                high = self.csr_file[csr_addr(Csr::timeh)] as u64;
+            }
+            Csr64::cycle => {
+                low = self.csr_file[csr_addr(Csr::cycle)] as u64;
+                high = self.csr_file[csr_addr(Csr::cycleh)] as u64;
+            }
+            Csr64::mcycle => {
+                low = self.csr_file[csr_addr(Csr::mcycle)] as u64;
+                high = self.csr_file[csr_addr(Csr::mcycleh)] as u64;
+            }
+            Csr64::instret => {
+                low = self.csr_file[csr_addr(Csr::instret)] as u64;
+                high = self.csr_file[csr_addr(Csr::instreth)] as u64;
+            }
+            Csr64::minstret => {
+                low = self.csr_file[csr_addr(Csr::minstret)] as u64;
+                high = self.csr_file[csr_addr(Csr::minstreth)] as u64;
+            }
+            Csr64::medeleg => {
+                low = self.csr_file[csr_addr(Csr::medeleg)] as u64;
+                high = self.csr_file[csr_addr(Csr::medelegh)] as u64;
+            }
+            Csr64::mstatus => {
+                low = self.csr_file[csr_addr(Csr::mstatus)] as u64;
+                high = self.csr_file[csr_addr(Csr::mstatush)] as u64;
+            }
+        };
+        (high << 32) + low
     }
 
-    pub fn write_mcycle(&mut self, data: u64) {
-        let mcycleh = (data >> 32) as u32;
-        let mcycle = data as u32;
-        self.csr_file[csr_addr(Csr::mcycle)] = mcycle;
-        self.csr_file[csr_addr(Csr::mcycleh)] = mcycleh;
+    pub fn write_64(&mut self, csr: Csr64, data: u64) {
+        match csr {
+            Csr64::time => {
+                self.csr_file[csr_addr(Csr::time)] = data as u32;
+                self.csr_file[csr_addr(Csr::timeh)] = (data >> 32) as u32;
+            }
+            Csr64::cycle => {
+                self.csr_file[csr_addr(Csr::cycle)] = data as u32;
+                self.csr_file[csr_addr(Csr::cycleh)] = (data >> 32) as u32;
+            }
+            Csr64::mcycle => {
+                self.csr_file[csr_addr(Csr::mcycle)] = data as u32;
+                self.csr_file[csr_addr(Csr::mcycleh)] = (data >> 32) as u32;
+            }
+            Csr64::instret => {
+                self.csr_file[csr_addr(Csr::instret)] = data as u32;
+                self.csr_file[csr_addr(Csr::instreth)] = (data >> 32) as u32;
+            }
+            Csr64::minstret => {
+                self.csr_file[csr_addr(Csr::minstret)] = data as u32;
+                self.csr_file[csr_addr(Csr::minstreth)] = (data >> 32) as u32;
+            }
+            Csr64::medeleg => {
+                self.csr_file[csr_addr(Csr::medeleg)] = data as u32;
+                self.csr_file[csr_addr(Csr::medelegh)] = (data >> 32) as u32;
+            }
+            Csr64::mstatus => {
+                self.csr_file[csr_addr(Csr::mstatus)] = data as u32;
+                self.csr_file[csr_addr(Csr::mstatush)] = (data >> 32) as u32;
+            }
+        };
+    }
+
+    pub fn mirror(&mut self) {
+        let mstatus = self.read(Csr::mstatus, 3);
+        let mask = 0b10000001100011111110011111100011;
+        self.write(Csr::sstatus, mstatus & mask, 3);
     }
 
 
 }
 
+#[derive(Debug)]
+#[allow(non_camel_case_types, dead_code)]
+pub enum Csr64 {
+    cycle,
+    time,
+    instret,
+
+    mcycle,
+    minstret,
+
+    medeleg,
+
+    mstatus,
+}
 
 
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, dead_code)]
 pub enum Csr {
     mscratch,
     sscratch,

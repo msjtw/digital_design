@@ -3,7 +3,7 @@ mod datapath;
 pub mod instr_parse;
 
 use crate::memory::{self};
-use csr_file::{CSR_file, Csr};
+use csr_file::{CSR_file, Csr, Csr64};
 use instr_parse::{Instruction, InstructionError};
 use std::{error::Error, fmt, fs, u32};
 
@@ -150,15 +150,13 @@ impl<'a> Core<'a> {
         )
     }
 
-    pub fn exec(&mut self, last_op_time: u64) -> Result<State, ExecError> {
+    pub fn exec(&mut self) -> Result<State, ExecError> {
         self.inst_count += 1;
         // if super::DEBUG {
         //     print!("|");
         // }
 
-        let mtime = self.memory.csr_read(memory::Time::Mtime) + last_op_time;
-        self.memory.csr_write(memory::Time::Mtime, mtime).unwrap();
-
+        let mtime = self.memory.csr_read(memory::Time::Mtime);
         let mtimecmp = self.memory.csr_read(memory::Time::Mtimecmp);
 
         let mut mip = self.csr_file.read(Csr::mip, self.mode);
@@ -189,8 +187,8 @@ impl<'a> Core<'a> {
                 self.trap = 0;
                 self.is_trap = true;
             } else {
-                let cycle = self.csr_file.read_mcycle();
-                self.csr_file.write_mcycle(cycle+1);
+                let cycle = self.csr_file.read_64(Csr64::mcycle);
+                self.csr_file.write_64(Csr64::mcycle, cycle+1);
 
                 let memory_result = self.memory.get_word(self.pc);
                 if super::DEBUG && self.memory.csr_read(memory::Time::Mtime) > super::PRINT_START {
@@ -287,7 +285,10 @@ impl<'a> Core<'a> {
             // clear trap
             self.trap = 0;
             self.is_trap = false;
-
+        }
+        else{
+            let minstret = self.csr_file.read_64(Csr64::minstret);
+            self.csr_file.write_64(Csr64::minstret, minstret+1);
         }
 
         Ok(State::Ok)

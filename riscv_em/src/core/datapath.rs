@@ -459,7 +459,20 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                             core.csr_file.write(super::Csr::mstatus, mstatus, core.mode);
                             // restore pc
                             core.pc = core.csr_file.read(super::Csr::mepc, core.mode)
-                            // core.pc += 4;
+                        }
+                        // sret
+                        0b000100000010 => {
+                            let mut sstatus = core.csr_file.read(super::Csr::sstatus, core.mode);
+                            // restore last mode and set spp = 0
+                            core.mode = (sstatus >> 8) & 0b1;
+                            sstatus &= !(0b1 << 8);
+                            // restore sie and set spie to 1
+                            sstatus &= !0b10;
+                            sstatus |= (sstatus & 1 << 5) >> 4;
+                            sstatus |= 0b1 << 5;
+                            core.csr_file.write(super::Csr::sstatus, sstatus, core.mode);
+                            // restore pc
+                            core.pc = core.csr_file.read(super::Csr::sepc, core.mode)
                         }
                         // wfi
                         0b000100000101 => {
