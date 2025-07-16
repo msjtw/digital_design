@@ -1,7 +1,7 @@
 use crate::core::Core;
 use crate::core::instr_parse::{BType, IType, InstructionError, JType, RType, SType, UType};
 
-use super::{ExecError, State};
+use super::{csr, ExecError, State};
 
 pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
     match instr.opcode {
@@ -388,37 +388,37 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
         0b1110011 => {
             let imm = (instr.imm & 4095) as u32;
             let tmp = core.reg_file[instr.rs1 as usize] as u32;
-            let csr = core.csr_file.read_addr(imm, core.mode);
+            let csr = csr::read_addr(imm, core);
             core.reg_file[instr.rd as usize] = csr as i32;
             match instr.funct3 {
                 // csrrw
                 0b001 => {
-                    core.csr_file.write_addr(imm, tmp, core.mode);
+                    csr::write_addr(imm, tmp, core);
                     core.pc += 4;
                 }
                 // csrrs
                 0b010 => {
-                    core.csr_file.write_addr(imm, csr | tmp, core.mode);
+                    csr::write_addr(imm, csr | tmp, core);
                     core.pc += 4;
                 }
                 // csrrc
                 0b011 => {
-                    core.csr_file.write_addr(imm, csr & !tmp, core.mode);
+                    csr::write_addr(imm, csr & !tmp, core);
                     core.pc += 4;
                 }
                 // csrrwi
                 0b101 => {
-                    core.csr_file.write_addr(imm, instr.rs1, core.mode);
+                    csr::write_addr(imm, instr.rs1, core);
                     core.pc += 4;
                 }
                 // csrrsi
                 0b110 => {
-                    core.csr_file.write_addr(imm, csr | instr.rs1, core.mode);
+                    csr::write_addr(imm, csr | instr.rs1, core);
                     core.pc += 4;
                 }
                 // csrrci
                 0b111 => {
-                    core.csr_file.write_addr(imm, csr & !instr.rs1, core.mode);
+                    csr::write_addr(imm, csr & !instr.rs1, core);
                     core.pc += 4;
                 }
                 0b0 => {
@@ -448,7 +448,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         }
                         // mret
                         0b001100000010 => {
-                            let mut mstatus = core.csr_file.read(super::Csr::mstatus, core.mode);
+                            let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set mpp = 0
                             core.mode = (mstatus >> 11) & 0b11;
                             mstatus &= !(0b11 << 11);
@@ -456,13 +456,13 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                             mstatus &= !0b1000;
                             mstatus |= (mstatus & 1 << 7) >> 4;
                             mstatus |= 1 << 7;
-                            core.csr_file.write(super::Csr::mstatus, mstatus, core.mode);
+                            csr::write(super::Csr::mstatus, mstatus, core);
                             // restore pc
-                            core.pc = core.csr_file.read(super::Csr::mepc, core.mode)
+                            core.pc = csr::read(super::Csr::mepc, core)
                         }
                         // sret
                         0b000100000010 => {
-                            let mut sstatus = core.csr_file.read(super::Csr::sstatus, core.mode);
+                            let mut sstatus = csr::read(super::Csr::sstatus, core);
                             // restore last mode and set spp = 0
                             core.mode = (sstatus >> 8) & 0b1;
                             sstatus &= !(0b1 << 8);
@@ -470,9 +470,9 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                             sstatus &= !0b10;
                             sstatus |= (sstatus & 1 << 5) >> 4;
                             sstatus |= 0b1 << 5;
-                            core.csr_file.write(super::Csr::sstatus, sstatus, core.mode);
+                            csr::write(super::Csr::sstatus, sstatus, core);
                             // restore pc
-                            core.pc = core.csr_file.read(super::Csr::sepc, core.mode)
+                            core.pc = csr::read(super::Csr::sepc, core)
                         }
                         // wfi
                         0b000100000101 => {

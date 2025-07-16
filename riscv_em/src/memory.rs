@@ -2,7 +2,7 @@ use std::io::Write;
 use std::io::{Bytes, Read};
 use termion::async_stdin;
 
-pub enum Time {
+pub enum RTC {
     Mtime,
     Mtimecmp,
 }
@@ -165,27 +165,27 @@ impl Memory {
         Ok(())
     }
 
-    pub fn csr_read(&self, csr: Time) -> u64 {
+    pub fn csr_read(&self, csr: RTC) -> u64 {
         match csr {
-            Time::Mtime => {
+            RTC::Mtime => {
                 let mtimel = self.get_word(0x1100bff8).unwrap();
                 let mtimeh = self.get_word(0x1100bffc).unwrap();
                 ((mtimeh as u64) << 32) + mtimel as u64
             }
-            Time::Mtimecmp => {
+            RTC::Mtimecmp => {
                 let mtimecmpl = self.get_word(0x11004000).unwrap();
                 let mtimecmph = self.get_word(0x11004004).unwrap();
                 ((mtimecmph as u64) << 32) + mtimecmpl as u64
             }
         }
     }
-    pub fn csr_write(&mut self, csr: Time, val: u64) -> Result<(), u32> {
+    pub fn csr_write(&mut self, csr: RTC, val: u64) -> Result<(), u32> {
         match csr {
-            Time::Mtime => {
+            RTC::Mtime => {
                 self.insert_word(0x1100bff8, val as u32)?;
                 self.insert_word(0x1100bffc, (val >> 32) as u32)?;
             }
-            Time::Mtimecmp => {
+            RTC::Mtimecmp => {
                 self.insert_word(0x11004000, val as u32)?;
                 self.insert_word(0x11004004, (val >> 32) as u32)?;
             }

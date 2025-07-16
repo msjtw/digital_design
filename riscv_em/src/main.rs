@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // last_cycle = curr_cycle;
 
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros() as u64;
-        proc.memory.csr_write(memory::Time::Mtime, now).unwrap();
+        proc.memory.csr_write(memory::RTC::Mtime, now).unwrap();
 
         match proc.exec() {
             Ok(x) => match x {
