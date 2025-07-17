@@ -10,7 +10,7 @@ use termion::raw::IntoRawMode;
 
 const RAM_SIZE: usize = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = false;
+const DEBUG: bool = true;
 const PRINT_START: u64 = 0;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    let mut stdout = std::io::stdout().into_raw_mode().unwrap(); // Optional: raw mode
+    // let mut _stdout = std::io::stdout().into_raw_mode().unwrap(); // Optional: raw mode
     let mut memory = memory::Memory::default();
     let mut proc = core::Core::new(&mut memory);
     proc.read_data(
@@ -28,7 +28,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "/home/msjtw/Documents/digital_design/sixtyfourmb.dtb",
     )?;
 
+    let mut ctr = 0;
     loop {
+        ctr += 1;
         // let curr_cycle =
         //     ((*proc.csr(core::Csr::Cycleh) as u64) << 32) + (*proc.csr(core::Csr::Cycle) as u64);
         // let diff_cycle = curr_cycle - last_cycle;
@@ -64,9 +66,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        if DEBUG {
-            break;
-        }
+        // if DEBUG && ctr > 100 {
+        //     break;
+        // }
     }
 
     Ok(())

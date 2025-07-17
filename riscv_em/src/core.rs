@@ -173,7 +173,6 @@ impl<'a> Core<'a> {
             return Ok(State::Sleep);
         }
 
-        let mut rd = 0;
         // Global interrupt enabled
         let mstatus = csr::read(Csr::mstatus, self);
         let mie = csr::read(Csr::mie, self);
@@ -192,10 +191,10 @@ impl<'a> Core<'a> {
                 csr::write_64(Csr64::mcycle, cycle+1, self);
 
                 let memory_result = self.memory.get_word(self.pc);
-                if super::DEBUG && self.memory.csr_read(memory::RTC::Mtime) > super::PRINT_START {
+                if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
                     println!("{}", self.print_reg_file());
                     println!(
-                        "mstatus:{} {:x} {:?}: {:?}",
+                        "mstatus:{} 0x{:x} 0x{:x?}: 0x{:x?}",
                         csr::read(Csr::mstatus, self),
                         mtimecmp.max(mtime) - mtime,
                         self.pc,
@@ -205,22 +204,10 @@ impl<'a> Core<'a> {
                 if let Ok(byte_code) = memory_result {
                     let instr = Instruction::from(byte_code)?;
                     let ret = match instr {
-                        Instruction::R(x) => {
-                            rd = x.rd;
-                            datapath::exec_r(self, &x)
-                        }
-                        Instruction::I(x) => {
-                            rd = x.rd;
-                            datapath::exec_i(self, &x)
-                        }
-                        Instruction::U(x) => {
-                            rd = x.rd;
-                            datapath::exec_u(self, &x)
-                        }
-                        Instruction::J(x) => {
-                            rd = x.rd;
-                            datapath::exec_j(self, &x)
-                        }
+                        Instruction::R(x) => datapath::exec_r(self, &x),
+                        Instruction::I(x) => datapath::exec_i(self, &x),
+                        Instruction::U(x) => datapath::exec_u(self, &x),
+                        Instruction::J(x) => datapath::exec_j(self, &x),
                         Instruction::S(x) => datapath::exec_s(self, &x),
                         Instruction::B(x) => datapath::exec_b(self, &x),
                     };
@@ -277,6 +264,7 @@ impl<'a> Core<'a> {
         // Machine mode trap handler
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
+            println!("mmode trap")
         }
         if (self.trap as i32) < 0 {
             // interrupt
@@ -322,6 +310,7 @@ impl<'a> Core<'a> {
         // Supervisor mode trap handler
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
+            println!("smode trap")
         }
         if (self.trap as i32) < 0 {
             // interrupt
