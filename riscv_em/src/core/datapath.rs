@@ -1,7 +1,7 @@
 use crate::core::Core;
 use crate::core::instr_parse::{BType, IType, InstructionError, JType, RType, SType, UType};
 
-use super::{csr, ExecError, State};
+use super::{ExecError, State, csr};
 
 pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
     match instr.opcode {
@@ -393,32 +393,44 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
             match instr.funct3 {
                 // csrrw
                 0b001 => {
-                    csr::write_addr(imm, tmp, core);
+                    if instr.rs1 != 0 {
+                        csr::write_addr(imm, tmp, core);
+                    }
                     core.pc += 4;
                 }
                 // csrrs
                 0b010 => {
-                    csr::write_addr(imm, csr | tmp, core);
+                    if instr.rs1 != 0 {
+                        csr::write_addr(imm, csr | tmp, core);
+                    }
                     core.pc += 4;
                 }
                 // csrrc
                 0b011 => {
-                    csr::write_addr(imm, csr & !tmp, core);
+                    if instr.rs1 != 0 {
+                        csr::write_addr(imm, csr & !tmp, core);
+                    }
                     core.pc += 4;
                 }
                 // csrrwi
                 0b101 => {
-                    csr::write_addr(imm, instr.rs1, core);
+                    if instr.rs1 != 0 {
+                        csr::write_addr(imm, instr.rs1, core);
+                    }
                     core.pc += 4;
                 }
                 // csrrsi
                 0b110 => {
-                    csr::write_addr(imm, csr | instr.rs1, core);
+                    if instr.rs1 != 0 {
+                        csr::write_addr(imm, csr | instr.rs1, core);
+                    }
                     core.pc += 4;
                 }
                 // csrrci
                 0b111 => {
-                    csr::write_addr(imm, csr & !instr.rs1, core);
+                    if instr.rs1 != 0 {
+                        csr::write_addr(imm, csr & !instr.rs1, core);
+                    }
                     core.pc += 4;
                 }
                 0b0 => {
@@ -433,6 +445,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                                 // supervisor ecall
                                 core.trap = 9;
                                 core.is_trap = true;
+                                println!("sbi ecall unimplemeted");
                             } else if core.mode == 0 {
                                 // user ecall
                                 core.trap = 8;
@@ -448,6 +461,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         }
                         // mret
                         0b001100000010 => {
+                            println!("mret");
                             let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set mpp = 0
                             core.mode = (mstatus >> 11) & 0b11;
@@ -462,6 +476,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         }
                         // sret
                         0b000100000010 => {
+                            println!("sret");
                             let mut sstatus = csr::read(super::Csr::sstatus, core);
                             // restore last mode and set spp = 0
                             core.mode = (sstatus >> 8) & 0b1;

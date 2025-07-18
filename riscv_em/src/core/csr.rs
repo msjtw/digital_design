@@ -12,10 +12,12 @@ pub fn write(csr: Csr, data: u32, core: &mut Core) {
 }
 
 pub fn read_addr(addr: u32, core: &Core) -> u32 {
+    println!("csr read: 0x{:x}", addr);
     core.csr_file[addr as usize]
 }
 
 pub fn write_addr(addr: u32, data: u32, core: &mut Core) {
+    println!("csr write: 0x{:x} {:x}", addr, data);
     core.csr_file[addr as usize] = data;
     mirror(core);
 }

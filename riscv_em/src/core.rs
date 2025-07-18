@@ -192,11 +192,9 @@ impl<'a> Core<'a> {
 
                 let memory_result = self.memory.get_word(self.pc);
                 if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
-                    println!("{}", self.print_reg_file());
+                    // println!("{}", self.print_reg_file());
                     println!(
-                        "mstatus:{} 0x{:x} 0x{:x?}: 0x{:x?}",
-                        csr::read(Csr::mstatus, self),
-                        mtimecmp.max(mtime) - mtime,
+                        "0x{:x?}: 0x{:x?}",
                         self.pc,
                         memory_result.unwrap()
                     );
@@ -231,6 +229,7 @@ impl<'a> Core<'a> {
         }
 
         if self.is_trap {
+            println!("it's a trap");
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);

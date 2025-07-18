@@ -10,7 +10,7 @@ use termion::raw::IntoRawMode;
 
 const RAM_SIZE: usize = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = true;
+const DEBUG: bool = false;
 const PRINT_START: u64 = 0;
 
 fn main() -> Result<(), Box<dyn Error>> {
