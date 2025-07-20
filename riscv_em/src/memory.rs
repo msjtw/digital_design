@@ -193,3 +193,11 @@ impl Memory {
         Ok(())
     }
 }
+
+fn phys_read(addr: u32, core: &Memory){
+
+}
+
+fn phys_write(addr: u32, core: &mut Memory){
+
+}

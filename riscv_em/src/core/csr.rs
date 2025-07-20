@@ -11,13 +11,41 @@ pub fn write(csr: Csr, data: u32, core: &mut Core) {
     mirror(core);
 }
 
+#[allow(non_snake_case)]
+pub fn read_pmpXcfg(n: u32, core: &Core) -> u8 {
+    let addr = match n/4 {
+        0 => csr_addr(Csr::pmpcfg0),
+        1 => csr_addr(Csr::pmpcfg1),
+        2 => csr_addr(Csr::pmpcfg2),
+        _ => csr_addr(Csr::pmpcfg3),
+    };
+    let csr = core.csr_file[addr];
+    let val = csr >> (n%4)*8;
+    val as u8
+}
+
+#[allow(non_snake_case)]
+pub fn write_pmpXcfg(n: u32, data: u8, core: &mut Core) {
+    let addr = match n/4 {
+        0 => csr_addr(Csr::pmpcfg0),
+        1 => csr_addr(Csr::pmpcfg1),
+        2 => csr_addr(Csr::pmpcfg2),
+        _ => csr_addr(Csr::pmpcfg3),
+    };
+    let mut csr = core.csr_file[addr];
+    csr &= !(0b11111111 << (n%4)*8);
+    let data = u32::from(data) << (n%4)*8;
+    core.csr_file[addr] = csr & data;
+    mirror(core);
+}
+
 pub fn read_addr(addr: u32, core: &Core) -> u32 {
-    println!("csr read: 0x{:x}", addr);
+    // println!("csr read: 0x{:x}", addr);
     core.csr_file[addr as usize]
 }
 
 pub fn write_addr(addr: u32, data: u32, core: &mut Core) {
-    println!("csr write: 0x{:x} {:x}", addr, data);
+    // println!("csr write: 0x{:x} {:x}", addr, data);
     core.csr_file[addr as usize] = data;
     mirror(core);
 }
@@ -184,7 +212,47 @@ pub enum Csr {
 
     misa,
     mhartid,
+
+    pmpcfg0,
+    pmpcfg1,
+    pmpcfg2,
+    pmpcfg3,
+
+    pmpaddr0,
+    pmpaddr1,
+    pmpaddr2,
+    pmpaddr3,
+    pmpaddr4,
+    pmpaddr5,
+    pmpaddr6,
+    pmpaddr7,
+    pmpaddr8,
+    pmpaddr9,
+    pmpaddr10,
+    pmpaddr11,
+    pmpaddr12,
+    pmpaddr13,
+    pmpaddr14,
+    pmpaddr15,
+
+    pmp0cfg,
+    pmp1cfg,
+    pmp2cfg,
+    pmp3cfg,
+    pmp4cfg,
+    pmp5cfg,
+    pmp6cfg,
+    pmp7cfg,
+    pmp8cfg,
+    pmp9cfg,
+    pmp10cfg,
+    pmp11cfg,
+    pmp12cfg,
+    pmp13cfg,
+    pmp14cfg,
+    pmp15cfg,
 }
+
 
 fn csr_addr(csrname: Csr) -> usize {
     match csrname {
@@ -233,5 +301,28 @@ fn csr_addr(csrname: Csr) -> usize {
 
         Csr::misa => 0x301,
         Csr::mhartid => 0xF14,
+
+        Csr::pmpcfg0 => 0x3A0,
+        Csr::pmpcfg1 => 0x3A1,
+        Csr::pmpcfg2 => 0x3A2,
+        Csr::pmpcfg3 => 0x3A3,
+
+        Csr::pmpaddr0 => 0x3B0,
+        Csr::pmpaddr1 => 0x3B1,
+        Csr::pmpaddr2 => 0x3B2,
+        Csr::pmpaddr3 => 0x3B3,
+        Csr::pmpaddr4 => 0x3B4,
+        Csr::pmpaddr5 => 0x3B5,
+        Csr::pmpaddr6 => 0x3B6,
+        Csr::pmpaddr7 => 0x3B7,
+        Csr::pmpaddr8 => 0x3B8,
+        Csr::pmpaddr9 => 0x3B9,
+        Csr::pmpaddr10 => 0x3BA,
+        Csr::pmpaddr11 => 0x3BB,
+        Csr::pmpaddr12 => 0x3BC,
+        Csr::pmpaddr13 => 0x3BD,
+        Csr::pmpaddr14 => 0x3BE,
+        Csr::pmpaddr15 => 0x3BF,
+        _ => 0x0
     }
 }

@@ -109,48 +109,13 @@ impl<'a> Core<'a> {
         self.reg_file[10] = 0x00; // hart ID
         self.reg_file[11] = (super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32) as i32;
         self.mode = 3;
-        csr::write(Csr::misa, 0b01000000000000000001000100000001, self);
+        csr::write(Csr::misa, 0b01000000000010100001000100000001, self);
+        //                             zyxvwutsrponmlkjihgfedcba
         Ok(())
     }
 
-    pub fn print_reg_file(&self) -> String {
-        format!(
-            "Z:{:08x} ra:{:08x} sp:{:08x} gp:{:08x} tp:{:08x} t0:{:08x} t1:{:08x} t2:{:08x} s0:{:08x} s1:{:08x} a0:{:08x} a1:{:08x} a2:{:08x} a3:{:08x} a4:{:08x} a5:{:08x} a6:{:08x} a7:{:08x} s2:{:08x} s3:{:08x} s4:{:08x} s5:{:08x} s6:{:08x} s7:{:08x} s8:{:08x} s9:{:08x} s10:{:08x} s11:{:08x} t3:{:08x} t4:{:08x} t5:{:08x} t6:{:08x}",
-            self.reg_file[0] as u32,
-            self.reg_file[1] as u32,
-            self.reg_file[2] as u32,
-            self.reg_file[3] as u32,
-            self.reg_file[4] as u32,
-            self.reg_file[5] as u32,
-            self.reg_file[6] as u32,
-            self.reg_file[7] as u32,
-            self.reg_file[8] as u32,
-            self.reg_file[9] as u32,
-            self.reg_file[10] as u32,
-            self.reg_file[11] as u32,
-            self.reg_file[12] as u32,
-            self.reg_file[13] as u32,
-            self.reg_file[14] as u32,
-            self.reg_file[15] as u32,
-            self.reg_file[16] as u32,
-            self.reg_file[17] as u32,
-            self.reg_file[18] as u32,
-            self.reg_file[19] as u32,
-            self.reg_file[20] as u32,
-            self.reg_file[21] as u32,
-            self.reg_file[22] as u32,
-            self.reg_file[23] as u32,
-            self.reg_file[24] as u32,
-            self.reg_file[25] as u32,
-            self.reg_file[26] as u32,
-            self.reg_file[27] as u32,
-            self.reg_file[28] as u32,
-            self.reg_file[29] as u32,
-            self.reg_file[30] as u32,
-            self.reg_file[31] as u32,
-        )
-    }
 
+0x3B0
     pub fn exec(&mut self) -> Result<State, ExecError> {
         self.inst_count += 1;
         // if super::DEBUG {
@@ -192,10 +157,10 @@ impl<'a> Core<'a> {
 
                 let memory_result = self.memory.get_word(self.pc);
                 if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
-                    // println!("{}", self.print_reg_file());
+                    print_state(self);
                     println!(
                         "0x{:x?}: 0x{:x?}",
-                        self.pc,
+                        self.pc.max(super::RAM_OFFSET) - super::RAM_OFFSET,
                         memory_result.unwrap()
                     );
                 }
@@ -214,6 +179,7 @@ impl<'a> Core<'a> {
                         Ok(x) => return Ok(x),
                         Err(ExecError::InstructionError(InstructionError::NoInstruction))
                         | Err(ExecError::InstructionError(InstructionError::NotSupported)) => {
+                            println!("Not supported: 0x{:x}", byte_code);
                             self.trap = 2;
                             self.is_trap = true;
                         }
@@ -230,6 +196,7 @@ impl<'a> Core<'a> {
 
         if self.is_trap {
             println!("it's a trap");
+            println!("{}", self.trap);
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
@@ -351,4 +318,41 @@ impl<'a> Core<'a> {
         self.is_trap = false;
     }
 
+}
+pub fn print_state(core: &Core)  {
+    println!(
+        "Z:{:08x} ra:{:08x} sp:{:08x} gp:{:08x} tp:{:08x} t0:{:08x} t1:{:08x} t2:{:08x} s0:{:08x} s1:{:08x} a0:{:08x} a1:{:08x} a2:{:08x} a3:{:08x} a4:{:08x} a5:{:08x} a6:{:08x} a7:{:08x} s2:{:08x} s3:{:08x} s4:{:08x} s5:{:08x} s6:{:08x} s7:{:08x} s8:{:08x} s9:{:08x} s10:{:08x} s11:{:08x} t3:{:08x} t4:{:08x} t5:{:08x} t6:{:08x}",
+        core.reg_file[0] as u32,
+        core.reg_file[1] as u32,
+        core.reg_file[2] as u32,
+        core.reg_file[3] as u32,
+        core.reg_file[4] as u32,
+        core.reg_file[5] as u32,
+        core.reg_file[6] as u32,
+        core.reg_file[7] as u32,
+        core.reg_file[8] as u32,
+        core.reg_file[9] as u32,
+        core.reg_file[10] as u32,
+        core.reg_file[11] as u32,
+        core.reg_file[12] as u32,
+        core.reg_file[13] as u32,
+        core.reg_file[14] as u32,
+        core.reg_file[15] as u32,
+        core.reg_file[16] as u32,
+        core.reg_file[17] as u32,
+        core.reg_file[18] as u32,
+        core.reg_file[19] as u32,
+        core.reg_file[20] as u32,
+        core.reg_file[21] as u32,
+        core.reg_file[22] as u32,
+        core.reg_file[23] as u32,
+        core.reg_file[24] as u32,
+        core.reg_file[25] as u32,
+        core.reg_file[26] as u32,
+        core.reg_file[27] as u32,
+        core.reg_file[28] as u32,
+        core.reg_file[29] as u32,
+        core.reg_file[30] as u32,
+        core.reg_file[31] as u32,
+    );
 }
