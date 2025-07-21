@@ -397,44 +397,32 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
             match instr.funct3 {
                 // csrrw
                 0b001 => {
-                    if instr.rs1 != 0 {
-                        csr::write_addr(imm, reg, core);
-                    }
+                    csr::write_addr(imm, reg, core);
                     core.pc += 4;
                 }
                 // csrrs
                 0b010 => {
-                    if instr.rs1 != 0 {
-                        csr::write_addr(imm, csr | reg, core);
-                    }
+                    csr::write_addr(imm, csr | reg, core);
                     core.pc += 4;
                 }
                 // csrrc
                 0b011 => {
-                    if instr.rs1 != 0 {
-                        csr::write_addr(imm, csr & !reg, core);
-                    }
+                    csr::write_addr(imm, csr & !reg, core);
                     core.pc += 4;
                 }
                 // csrrwi
                 0b101 => {
-                    if instr.rs1 != 0 {
-                        csr::write_addr(imm, instr.rs1, core);
-                    }
+                    csr::write_addr(imm, instr.rs1, core);
                     core.pc += 4;
                 }
                 // csrrsi
                 0b110 => {
-                    if instr.rs1 != 0 {
-                        csr::write_addr(imm, csr | instr.rs1, core);
-                    }
+                    csr::write_addr(imm, csr | instr.rs1, core);
                     core.pc += 4;
                 }
                 // csrrci
                 0b111 => {
-                    if instr.rs1 != 0 {
-                        csr::write_addr(imm, csr & !instr.rs1, core);
-                    }
+                    csr::write_addr(imm, csr & !instr.rs1, core);
                     core.pc += 4;
                 }
                 0b0 => {
@@ -465,7 +453,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         }
                         // mret
                         0b001100000010 => {
-                            // println!("mret");
                             let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set mpp = 0
                             core.mode = (mstatus >> 11) & 0b11;
@@ -480,7 +467,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         }
                         // sret
                         0b000100000010 => {
-                            // println!("sret");
                             let mut sstatus = csr::read(super::Csr::sstatus, core);
                             // restore last mode and set spp = 0
                             core.mode = (sstatus >> 8) & 0b1;

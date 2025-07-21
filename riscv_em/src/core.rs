@@ -152,7 +152,7 @@ impl<'a> Core<'a> {
                 let cycle = csr::read_64(Csr64::mcycle, self);
                 csr::write_64(Csr64::mcycle, cycle+1, self);
 
-                let memory_result = memory::read_word(self.pc, self);
+                let memory_result = memory::fetch_word(self.pc, self);
                 if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
                     print_state(self);
                     println!(

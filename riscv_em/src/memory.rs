@@ -48,6 +48,21 @@ pub fn read_word(addr: u32, core: &Core) -> Result<u32, u32> {
     let a = memory.data[address + 3] as u32;
     Ok((a << 24) + (b << 16) + (c << 8) + d)
 }
+pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, u32> {
+    let memory = &core.memory;
+    // if addr & 0b11 > 0 {
+    //     println!("{}", addr & 0b11);
+    //     return Err(4);
+    // }
+
+    let address = (addr - memory.base_addr) as usize;
+    let d = memory.data[address] as u32;
+    let c = memory.data[address + 1] as u32;
+    let b = memory.data[address + 2] as u32;
+    let a = memory.data[address + 3] as u32;
+    Ok((a << 24) + (b << 16) + (c << 8) + d)
+}
+
 pub fn read_hword(addr: u32, core: &Core) -> Result<u16, u32> {
     let memory = &core.memory;
     // if addr & 0b1 > 0 {
@@ -164,6 +179,6 @@ fn phys_read(addr: u32, core: &Memory){
 
 }
 
-fn phys_write(addr: u32, core: &mut Memory){
+fn phys_write(addr: u32, data: u8, core: &mut Memory){
 
 }

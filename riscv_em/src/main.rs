@@ -11,7 +11,7 @@ use termion::raw::IntoRawMode;
 
 const RAM_SIZE: usize = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = true;
+const DEBUG: bool = false;
 const PRINT_START: u64 = 0;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    // let mut _stdout = std::io::stdout().into_raw_mode().unwrap(); // Optional: raw mode
+    let mut _stdout = std::io::stdout().into_raw_mode().unwrap(); // Optional: raw mode
     let mut memory = memory::Memory::default();
     let mut proc = core::Core::new(&mut memory);
     proc.read_data(
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         ctr += 1;
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros() as u64;
-        proc.mtime = proc.csr_file[0xB00] as u64;
+        proc.mtime = now;
 
         match proc.exec() {
             Ok(x) => match x {
