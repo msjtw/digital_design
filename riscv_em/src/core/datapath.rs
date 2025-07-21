@@ -1,5 +1,6 @@
 use crate::core::Core;
 use crate::core::instr_parse::{BType, IType, InstructionError, JType, RType, SType, UType};
+use crate::memory;
 
 use super::{ExecError, State, csr};
 
@@ -167,7 +168,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
             let addr = core.reg_file[instr.rs1 as usize] as u32;
             let rs2 = core.reg_file[instr.rs2 as usize];
             let rd;
-            match core.memory.get_word(addr) {
+            match memory::read_word(addr, core) {
                 Ok(x) => rd = x as i32,
                 Err(x) => {
                     core.trap = x;
@@ -234,7 +235,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                 _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
             }
             if write {
-                core.memory.insert_word(addr, write_val as u32);
+                memory::write_word(addr, write_val as u32, core);
             }
             core.pc += 4;
         }
@@ -314,7 +315,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
             match instr.funct3 {
                 // lb sign-extended
                 0x0 => {
-                    match core.memory.get_byte(addr) {
+                    match memory::read_byte(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i8),
                         Err(x) => {
                             core.trap = x;
@@ -325,7 +326,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                 }
                 // lh
                 0x1 => {
-                    match core.memory.get_hword(addr) {
+                    match memory::read_hword(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i16),
                         Err(x) => {
                             core.trap = x;
@@ -336,10 +337,10 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                 }
                 // lw
                 0x2 => {
-                    match core.memory.get_word(addr) {
+                    match memory::read_word(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(x) => {
-                            println!("yo errro {:?}", x);
+                            // println!("yo errro {:?}", x);
                             core.trap = x;
                             core.is_trap = true;
                             return Ok(State::Ok);
@@ -348,7 +349,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                 }
                 // lbu zero-extended
                 0x4 => {
-                    match core.memory.get_byte(addr) {
+                    match memory::read_byte(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(x) => {
                             core.trap = x;
@@ -359,7 +360,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                 }
                 // lhu
                 0x5 => {
-                    match core.memory.get_hword(addr) {
+                    match memory::read_hword(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(x) => {
                             core.trap = x;
@@ -387,28 +388,31 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
         }
         0b1110011 => {
             let imm = (instr.imm & 4095) as u32;
-            let tmp = core.reg_file[instr.rs1 as usize] as u32;
+            let reg = core.reg_file[instr.rs1 as usize] as u32;
             let csr = csr::read_addr(imm, core);
             core.reg_file[instr.rd as usize] = csr as i32;
+            if super::super::DEBUG{
+                println!("csr adr:{:x}, reg:{:x}, csr:{:x}", imm, reg, csr);
+            }
             match instr.funct3 {
                 // csrrw
                 0b001 => {
                     if instr.rs1 != 0 {
-                        csr::write_addr(imm, tmp, core);
+                        csr::write_addr(imm, reg, core);
                     }
                     core.pc += 4;
                 }
                 // csrrs
                 0b010 => {
                     if instr.rs1 != 0 {
-                        csr::write_addr(imm, csr | tmp, core);
+                        csr::write_addr(imm, csr | reg, core);
                     }
                     core.pc += 4;
                 }
                 // csrrc
                 0b011 => {
                     if instr.rs1 != 0 {
-                        csr::write_addr(imm, csr & !tmp, core);
+                        csr::write_addr(imm, csr & !reg, core);
                     }
                     core.pc += 4;
                 }
@@ -461,7 +465,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         }
                         // mret
                         0b001100000010 => {
-                            println!("mret");
+                            // println!("mret");
                             let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set mpp = 0
                             core.mode = (mstatus >> 11) & 0b11;
@@ -476,7 +480,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         }
                         // sret
                         0b000100000010 => {
-                            println!("sret");
+                            // println!("sret");
                             let mut sstatus = csr::read(super::Csr::sstatus, core);
                             // restore last mode and set spp = 0
                             core.mode = (sstatus >> 8) & 0b1;
@@ -519,17 +523,17 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
     let rs2 = core.reg_file[instr.rs2 as usize];
     let x = match instr.funct3 {
         //sb
-        0x0 => match core.memory.insert_byte(addr, rs2 as u8) {
+        0x0 => match memory::write_byte(addr, rs2 as u8, core) {
             Ok(_) => Ok(0),
             Err(x) => Err(x),
         },
         //sh
-        0x1 => match core.memory.insert_hword(addr, rs2 as u16) {
+        0x1 => match memory::write_hword(addr, rs2 as u16, core) {
             Ok(_) => Ok(0),
             Err(x) => Err(x),
         },
         //sw
-        0x2 => core.memory.insert_word(addr, rs2 as u32),
+        0x2 => memory::write_word(addr, rs2 as u32, core),
         _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
     };
     match x {

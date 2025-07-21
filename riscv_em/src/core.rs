@@ -52,10 +52,12 @@ impl fmt::Display for ExecError {
 pub struct Core<'a> {
     pub pc: u32,
     reg_file: [i32; 32],
-    csr_file: [u32; 4096],
+    pub csr_file: [u32; 4096],
     pub memory: &'a mut memory::Memory,
 
-    pub inst_count: u64,
+    pub mtime: u64,
+    pub mtimecmp: u64,
+
     trap: u32,
     trap_val: u32,
     is_trap: bool,
@@ -73,7 +75,8 @@ impl<'a> Core<'a> {
             csr_file: [0; 4096],
             memory,
 
-            inst_count: 0,
+            mtime: 0,
+            mtimecmp: 0,
 
             trap: 0,
             trap_val: 0,
@@ -92,16 +95,15 @@ impl<'a> Core<'a> {
     ) -> Result<(), Box<dyn std::error::Error + 'static>> {
         let data = fs::read(kernel)?;
         for i in 0..data.len() {
-            let _ = self
-                .memory
-                .insert_byte(i as u32 + super::RAM_OFFSET, data[i]);
+            let _ = memory::write_byte(i as u32 + super::RAM_OFFSET, data[i], self);
         }
 
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
-            let _ = self.memory.insert_byte(
+            let _ = memory::write_byte(
                 super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32 + i as u32,
                 data[i],
+                self
             );
         }
 
@@ -109,24 +111,19 @@ impl<'a> Core<'a> {
         self.reg_file[10] = 0x00; // hart ID
         self.reg_file[11] = (super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32) as i32;
         self.mode = 3;
-        csr::write(Csr::misa, 0b01000000000010100001000100000001, self);
+        csr::write(Csr::misa, 0b01000000000010000001000100000001, self);
         //                             zyxvwutsrponmlkjihgfedcba
         Ok(())
     }
 
 
-0x3B0
     pub fn exec(&mut self) -> Result<State, ExecError> {
-        self.inst_count += 1;
         // if super::DEBUG {
         //     print!("|");
         // }
 
-        let mtime = self.memory.csr_read(memory::RTC::Mtime);
-        let mtimecmp = self.memory.csr_read(memory::RTC::Mtimecmp);
-
         let mut mip = csr::read(Csr::mip, self);
-        if mtime > mtimecmp {
+        if self.mtime > self.mtimecmp {
             mip |= 1 << 7;
             self.wfi = false;
         } else {
@@ -155,12 +152,12 @@ impl<'a> Core<'a> {
                 let cycle = csr::read_64(Csr64::mcycle, self);
                 csr::write_64(Csr64::mcycle, cycle+1, self);
 
-                let memory_result = self.memory.get_word(self.pc);
+                let memory_result = memory::read_word(self.pc, self);
                 if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
                     print_state(self);
                     println!(
                         "0x{:x?}: 0x{:x?}",
-                        self.pc.max(super::RAM_OFFSET) - super::RAM_OFFSET,
+                        self.pc,
                         memory_result.unwrap()
                     );
                 }
@@ -195,8 +192,8 @@ impl<'a> Core<'a> {
         }
 
         if self.is_trap {
-            println!("it's a trap");
-            println!("{}", self.trap);
+            // println!("it's a trap");
+            // println!("{}", self.trap);
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
@@ -230,7 +227,7 @@ impl<'a> Core<'a> {
         // Machine mode trap handler
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
-            println!("mmode trap")
+            // println!("mmode trap");
         }
         if (self.trap as i32) < 0 {
             // interrupt
@@ -276,7 +273,7 @@ impl<'a> Core<'a> {
         // Supervisor mode trap handler
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
-            println!("smode trap")
+            // println!("smode trap");
         }
         if (self.trap as i32) < 0 {
             // interrupt

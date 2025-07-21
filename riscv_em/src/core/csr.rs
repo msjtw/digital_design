@@ -1,4 +1,5 @@
 use super::Core;
+use crate::memory;
 
 pub fn read(csr: Csr, core: &Core) -> u32 {
     let addr = csr_addr(csr);
@@ -129,7 +130,7 @@ fn mirror(core: &mut Core) {
     // timers
     let mcycle = core.csr_file[csr_addr(Csr::mcycle)];
     let mcycleh = core.csr_file[csr_addr(Csr::mcycleh)];
-    let time = core.memory.csr_read(crate::memory::RTC::Mtime);
+    let time = core.mtime;
     let minstret = core.csr_file[csr_addr(Csr::minstret)];
     let minstreth = core.csr_file[csr_addr(Csr::minstreth)];
     core.csr_file[csr_addr(Csr::cycle)] = mcycle;
