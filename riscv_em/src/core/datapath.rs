@@ -1,10 +1,10 @@
 use crate::core::Core;
-use crate::core::instr_parse::{BType, IType, InstructionError, JType, RType, SType, UType};
+use crate::core::instr_parse::{BType, IType, JType, RType, SType, UType};
 use crate::memory;
 
-use super::{ExecError, State, csr};
+use super::{Exception, State, csr};
 
-pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
+pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
     match instr.opcode {
         0b0110011 => {
             match instr.funct3 {
@@ -30,7 +30,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                         let tmp = a * b;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                    _ => return Err(Exception::Illegal_instruction),
                 },
                 0x4 => match instr.funct7 {
                     //xor
@@ -47,7 +47,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                                 / core.reg_file[instr.rs2 as usize];
                         }
                     }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                    _ => return Err(Exception::Illegal_instruction),
                 },
                 0x6 => match instr.funct7 {
                     //or
@@ -60,7 +60,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                         core.reg_file[instr.rd as usize] =
                             core.reg_file[instr.rs1 as usize] % core.reg_file[instr.rs2 as usize];
                     }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                    _ => return Err(Exception::Illegal_instruction),
                 },
                 0x7 => match instr.funct7 {
                     //and
@@ -75,7 +75,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                             % core.reg_file[instr.rs2 as usize] as u32)
                             as i32;
                     }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                    _ => return Err(Exception::Illegal_instruction),
                 },
                 0x1 => match instr.funct7 {
                     //sll
@@ -92,7 +92,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                         let tmp = (a * b) >> 32;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                    _ => return Err(Exception::Illegal_instruction),
                 },
                 0x5 => match instr.funct7 {
                     //srl
@@ -114,7 +114,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                         core.reg_file[instr.rd as usize] =
                             core.reg_file[instr.rs1 as usize] >> core.reg_file[instr.rs2 as usize];
                     }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                    _ => return Err(Exception::Illegal_instruction),
                 },
                 0x2 => match instr.funct7 {
                     //slt
@@ -134,7 +134,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                         let tmp = (a * b) >> 32;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                    _ => return Err(Exception::Illegal_instruction),
                 },
                 0x3 => match instr.funct7 {
                     //sltu
@@ -155,10 +155,10 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                         let tmp = (a * b) >> 32;
                         core.reg_file[instr.rd as usize] = tmp as i32;
                     }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                    _ => return Err(Exception::Illegal_instruction),
                 },
 
-                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                _ => return Err(Exception::Illegal_instruction),
             };
             core.pc += 4;
         }
@@ -171,9 +171,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
             match memory::read_word(addr, core) {
                 Ok(x) => rd = x as i32,
                 Err(x) => {
-                    core.trap = x;
-                    core.is_trap = true;
-                    return Ok(State::Ok);
+                    return Err(x);
                 }
             };
             core.reg_file[instr.rd as usize] = rd;
@@ -232,20 +230,20 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, ExecError> {
                 0b11100 => {
                     write_val = (rd as u32).max(rs2 as u32) as i32;
                 }
-                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                _ => return Err(Exception::Illegal_instruction),
             }
             if write {
                 memory::write_word(addr, write_val as u32, core);
             }
             core.pc += 4;
         }
-        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+        _ => return Err(Exception::Illegal_instruction),
     };
 
     Ok(State::Ok)
 }
 
-pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
+pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
     match instr.opcode {
         0b0010011 => {
             match instr.funct3 {
@@ -286,7 +284,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         core.reg_file[instr.rd as usize] =
                             core.reg_file[instr.rs1 as usize] >> (instr.imm & 31);
                     }
-                    _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                    _ => return Err(Exception::Illegal_instruction),
                 },
                 //slti
                 0x2 => {
@@ -306,7 +304,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                             0
                         };
                 }
-                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                _ => return Err(Exception::Illegal_instruction),
             };
             core.pc += 4;
         }
@@ -317,59 +315,38 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                 0x0 => {
                     match memory::read_byte(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i8),
-                        Err(x) => {
-                            core.trap = x;
-                            core.is_trap = true;
-                            return Ok(State::Ok);
-                        }
+                        Err(x) => return Err(x),
                     };
                 }
                 // lh
                 0x1 => {
                     match memory::read_hword(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i16),
-                        Err(x) => {
-                            core.trap = x;
-                            core.is_trap = true;
-                            return Ok(State::Ok);
-                        }
+                        Err(x) => return Err(x),
                     };
                 }
                 // lw
                 0x2 => {
                     match memory::read_word(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
-                        Err(x) => {
-                            // println!("yo errro {:?}", x);
-                            core.trap = x;
-                            core.is_trap = true;
-                            return Ok(State::Ok);
-                        }
+                        Err(x) => return Err(x),
                     };
                 }
                 // lbu zero-extended
                 0x4 => {
                     match memory::read_byte(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
-                        Err(x) => {
-                            core.trap = x;
-                            core.is_trap = true;
-                            return Ok(State::Ok);
-                        }
+                        Err(x) => return Err(x),
                     };
                 }
                 // lhu
                 0x5 => {
                     match memory::read_hword(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
-                        Err(x) => {
-                            core.trap = x;
-                            core.is_trap = true;
-                            return Ok(State::Ok);
-                        }
+                        Err(x) => return Err(x),
                     };
                 }
-                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                _ => return Err(Exception::Illegal_instruction),
             };
             core.pc += 4;
         }
@@ -391,7 +368,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
             let reg = core.reg_file[instr.rs1 as usize] as u32;
             let csr = csr::read_addr(imm, core);
             core.reg_file[instr.rd as usize] = csr as i32;
-            if super::super::DEBUG{
+            if super::super::DEBUG {
                 println!("csr adr:{:x}, reg:{:x}, csr:{:x}", imm, reg, csr);
             }
             match instr.funct3 {
@@ -431,24 +408,20 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                         0b0 => {
                             if core.mode == 3 {
                                 // machine ecall
-                                core.trap = 11;
-                                core.is_trap = true;
+                                return Err(Exception::Environment_call_from_Mmode);
                             } else if core.mode == 1 {
                                 // supervisor ecall
-                                core.trap = 9;
-                                core.is_trap = true;
                                 println!("sbi ecall unimplemeted");
+                                return Err(Exception::Environment_call_from_Smode);
                             } else if core.mode == 0 {
                                 // user ecall
-                                core.trap = 8;
-                                core.is_trap = true;
+                                return Err(Exception::Environment_call_from_Umode);
                             }
                             // core.pc += 4;
                         }
                         //ebreak
                         0b1 => {
-                            core.trap = 3;
-                            core.is_trap = true;
+                            return Err(Exception::Breakpoint);
                             // core.pc += 4;
                         }
                         // mret
@@ -486,25 +459,21 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, ExecError> {
                             core.pc += 4;
                             return Ok(State::Sleep);
                         }
-                        _ => {
-                            return Err(ExecError::InstructionError(
-                                InstructionError::NoInstruction,
-                            ));
-                        }
+                        _ => return Err(Exception::Illegal_instruction),
                     }
                 }
-                _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+                _ => return Err(Exception::Illegal_instruction),
             };
         }
         // fence, pause
         0b0001111 => core.pc += 4,
 
-        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+        _ => return Err(Exception::Illegal_instruction),
     };
     Ok(State::Ok)
 }
 
-pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
+pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, Exception> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
     let rs2 = core.reg_file[instr.rs2 as usize];
     let x = match instr.funct3 {
@@ -520,7 +489,7 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
         },
         //sw
         0x2 => memory::write_word(addr, rs2 as u32, core),
-        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+        _ => return Err(Exception::Illegal_instruction),
     };
     match x {
         Ok(0x7777) => {
@@ -532,15 +501,12 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, ExecError> {
             return Ok(State::Shutdown);
         }
         Ok(_) => core.pc += 4,
-        Err(x) => {
-            core.trap = x;
-            core.is_trap = true;
-        }
+        Err(x) => return Err(x),
     }
     Ok(State::Ok)
 }
 
-pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, ExecError> {
+pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, Exception> {
     let rs1 = core.reg_file[instr.rs1 as usize];
     let rs2 = core.reg_file[instr.rs2 as usize];
     let last_pc = core.pc;
@@ -581,7 +547,7 @@ pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, ExecError> {
                 core.pc = (core.pc as i32 + instr.imm) as u32;
             };
         }
-        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+        _ => return Err(Exception::Illegal_instruction),
     };
     if core.pc == last_pc {
         core.pc += 4;
@@ -589,7 +555,7 @@ pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, ExecError> {
     Ok(State::Ok)
 }
 
-pub fn exec_u(core: &mut Core, instr: &UType) -> Result<State, ExecError> {
+pub fn exec_u(core: &mut Core, instr: &UType) -> Result<State, Exception> {
     match instr.opcode {
         //lui
         0b0110111 => {
@@ -600,20 +566,20 @@ pub fn exec_u(core: &mut Core, instr: &UType) -> Result<State, ExecError> {
             core.reg_file[instr.rd as usize] =
                 (i64::from(core.pc) + i64::from(instr.imm << 12)) as i32;
         }
-        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+        _ => return Err(Exception::Illegal_instruction),
     };
     core.pc += 4;
     Ok(State::Ok)
 }
 
-pub fn exec_j(core: &mut Core, instr: &JType) -> Result<State, ExecError> {
+pub fn exec_j(core: &mut Core, instr: &JType) -> Result<State, Exception> {
     match instr.opcode {
         //jal
         0b1101111 => {
             core.reg_file[instr.rd as usize] = (core.pc + 4) as i32;
             core.pc = (core.pc as i32 + instr.imm) as u32;
         }
-        _ => return Err(ExecError::InstructionError(InstructionError::NoInstruction)),
+        _ => return Err(Exception::Illegal_instruction),
     };
     Ok(State::Ok)
 }

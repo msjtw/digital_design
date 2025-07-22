@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    let mut _stdout = std::io::stdout().into_raw_mode().unwrap(); // Optional: raw mode
+    // let mut _stdout = std::io::stdout().into_raw_mode().unwrap(); // Optional: raw mode
     let mut memory = memory::Memory::default();
     let mut proc = core::Core::new(&mut memory);
     proc.read_data(
@@ -67,9 +67,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        // if DEBUG && ctr > 100 {
-        //     break;
-        // }
+        if DEBUG && ctr > 1e6 as u32 {
+            break;
+        }
     }
 
     Ok(())

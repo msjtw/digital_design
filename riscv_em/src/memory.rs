@@ -1,4 +1,6 @@
-use crate::core::{Core};
+mod pmp;
+
+use crate::core::{Core, exceptions};
 use std::io::Write;
 use std::io::{Bytes, Read};
 use termion::async_stdin;
@@ -25,7 +27,14 @@ impl Default for Memory {
         }
     }
 }
-pub fn read_word(addr: u32, core: &Core) -> Result<u32, u32> {
+
+pub struct MemoryPermissions {
+    r: bool,
+    w: bool,
+    x: bool,
+}
+
+pub fn read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
     let memory = &core.memory;
     // if addr & 0b11 > 0 {
     //     println!("{}", addr & 0b11);
@@ -48,7 +57,7 @@ pub fn read_word(addr: u32, core: &Core) -> Result<u32, u32> {
     let a = memory.data[address + 3] as u32;
     Ok((a << 24) + (b << 16) + (c << 8) + d)
 }
-pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, u32> {
+pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
     let memory = &core.memory;
     // if addr & 0b11 > 0 {
     //     println!("{}", addr & 0b11);
@@ -63,7 +72,7 @@ pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, u32> {
     Ok((a << 24) + (b << 16) + (c << 8) + d)
 }
 
-pub fn read_hword(addr: u32, core: &Core) -> Result<u16, u32> {
+pub fn read_hword(addr: u32, core: &Core) -> Result<u16, exceptions::Exception> {
     let memory = &core.memory;
     // if addr & 0b1 > 0 {
     //     return Err(4);
@@ -73,7 +82,7 @@ pub fn read_hword(addr: u32, core: &Core) -> Result<u16, u32> {
     let a = memory.data[address + 1] as u16;
     Ok((a << 8) + b)
 }
-pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, u32> {
+pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception> {
     let memory = &mut core.memory;
     if addr < memory.base_addr || addr > memory.memory_size {
         return match addr {
@@ -96,7 +105,7 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, u32> {
     Ok(memory.data[address])
 }
 
-pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, u32> {
+pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
     let memory = &mut core.memory;
     // if addr & 0b11 > 0 {
     //     return Err(6);
@@ -141,14 +150,14 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, u32> {
     memory.data[address + 3] = a;
     Ok(0)
 }
-pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), u32> {
+pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptions::Exception> {
     let memory = &mut core.memory;
     // if addr & 0b1 > 0 {
     //     return Err(6);
     // }
-    if addr < memory.base_addr {
-        return Err(7);
-    }
+    // if addr < memory.base_addr {
+    //     return Err(7);
+    // }
     let address = (addr - memory.base_addr) as usize;
     let mask: u16 = (2 << 8) - 1;
     let d: u8 = (data & mask) as u8;
@@ -157,7 +166,7 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), u32> {
     memory.data[address + 1] = c;
     Ok(())
 }
-pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), u32> {
+pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions::Exception> {
     let memory = &mut core.memory;
     if addr < memory.base_addr {
         match addr {
@@ -175,10 +184,4 @@ pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), u32> {
     Ok(())
 }
 
-fn phys_read(addr: u32, core: &Memory){
 
-}
-
-fn phys_write(addr: u32, data: u8, core: &mut Memory){
-
-}

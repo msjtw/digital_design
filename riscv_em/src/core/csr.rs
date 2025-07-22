@@ -151,6 +151,19 @@ fn mirror(core: &mut Core) {
 }
 
 #[derive(Debug)]
+struct Csr_permissions {
+    mode: u32,
+    w: bool,
+}
+
+fn permissions(addr: u32) -> Csr_permissions {
+    let mode = (addr & (0b11 << 8)) >> 8;
+    let rw = (addr & (0b11 << 10)) >> 10;
+    let w = rw < 0b11;
+    Csr_permissions { mode, w }
+}
+
+#[derive(Debug)]
 #[allow(non_camel_case_types, dead_code)]
 pub enum Csr64 {
     cycle,
@@ -236,26 +249,10 @@ pub enum Csr {
     pmpaddr14,
     pmpaddr15,
 
-    pmp0cfg,
-    pmp1cfg,
-    pmp2cfg,
-    pmp3cfg,
-    pmp4cfg,
-    pmp5cfg,
-    pmp6cfg,
-    pmp7cfg,
-    pmp8cfg,
-    pmp9cfg,
-    pmp10cfg,
-    pmp11cfg,
-    pmp12cfg,
-    pmp13cfg,
-    pmp14cfg,
-    pmp15cfg,
 }
 
 
-fn csr_addr(csrname: Csr) -> usize {
+pub fn csr_addr(csrname: Csr) -> usize {
     match csrname {
         Csr::mscratch => 0x340,
         Csr::sscratch => 0x140,
@@ -324,6 +321,5 @@ fn csr_addr(csrname: Csr) -> usize {
         Csr::pmpaddr13 => 0x3BD,
         Csr::pmpaddr14 => 0x3BE,
         Csr::pmpaddr15 => 0x3BF,
-        _ => 0x0
     }
 }

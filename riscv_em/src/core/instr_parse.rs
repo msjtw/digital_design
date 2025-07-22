@@ -1,5 +1,7 @@
 use std::{error::Error, fmt};
 
+use super::exceptions;
+
 //register
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -231,24 +233,6 @@ impl JType {
     }
 }
 
-#[derive(Debug)]
-pub enum InstructionError {
-    NoInstruction,
-    WrongOpcode,
-    NotSupported,
-}
-
-impl Error for InstructionError {}
-
-impl fmt::Display for InstructionError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::WrongOpcode => write!(f, "Instruction opcode doesn't match any type!"),
-            Self::NoInstruction => write!(f, "No such instruction"),
-            Self::NotSupported => write!(f, "Operation not supported!"),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub enum Instruction {
@@ -261,7 +245,7 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    pub fn from(byte_code: u32) -> Result<Self, InstructionError> {
+    pub fn from(byte_code: u32) -> Result<Self, exceptions::Exception> {
         let opcode = byte_code & 127;
         match opcode {
             0b0110011 | 0b0101111 => Ok(Instruction::R(RType::from(byte_code))),
@@ -275,7 +259,7 @@ impl Instruction {
             _ => {
                 println!("{opcode:b}");
                 println!("{byte_code:b}");
-                Err(InstructionError::WrongOpcode)
+                Err(exceptions::Exception::Illegal_instruction)
             }
         }
     }

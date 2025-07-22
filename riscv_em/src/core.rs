@@ -1,11 +1,13 @@
-mod csr;
+pub mod csr;
 mod datapath;
-pub mod instr_parse;
+pub mod exceptions;
+mod instr_parse;
 
 use crate::memory::{self};
 use csr::{Csr, Csr64};
-use instr_parse::{Instruction, InstructionError};
-use std::{error::Error, fmt, fs, u32};
+use exceptions::*;
+use instr_parse::{Instruction};
+use std::{fs, u32};
 
 #[derive(Debug)]
 pub enum State {
@@ -13,39 +15,6 @@ pub enum State {
     Sleep,
     Reboot,
     Shutdown,
-}
-
-#[derive(Debug)]
-pub enum ExecError {
-    Error,
-    InstructionError(InstructionError),
-    DataReadError,
-    End,
-}
-
-impl From<InstructionError> for ExecError {
-    fn from(err: InstructionError) -> Self {
-        Self::InstructionError(err)
-    }
-}
-
-impl From<object::Error> for ExecError {
-    fn from(_value: object::Error) -> Self {
-        Self::DataReadError
-    }
-}
-
-impl Error for ExecError {}
-
-impl fmt::Display for ExecError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Error => write!(f, "Error!"),
-            Self::DataReadError => write!(f, "Error reading data from ELF!"),
-            Self::InstructionError(x) => write!(f, "Instruction Error {x}"),
-            Self::End => write!(f, "End of execution!"),
-        }
-    }
 }
 
 // #[derive(Debug)]
@@ -63,7 +32,7 @@ pub struct Core<'a> {
     is_trap: bool,
     lr_address: u32,
     lr_valid: bool,
-    mode: u32,
+    pub mode: u32,
     wfi: bool, // wait for interrupt
 }
 
@@ -103,7 +72,7 @@ impl<'a> Core<'a> {
             let _ = memory::write_byte(
                 super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32 + i as u32,
                 data[i],
-                self
+                self,
             );
         }
 
@@ -116,8 +85,7 @@ impl<'a> Core<'a> {
         Ok(())
     }
 
-
-    pub fn exec(&mut self) -> Result<State, ExecError> {
+    pub fn exec(&mut self) -> Result<State, Exception> {
         // if super::DEBUG {
         //     print!("|");
         // }
@@ -150,46 +118,48 @@ impl<'a> Core<'a> {
                 self.is_trap = true;
             } else {
                 let cycle = csr::read_64(Csr64::mcycle, self);
-                csr::write_64(Csr64::mcycle, cycle+1, self);
+                csr::write_64(Csr64::mcycle, cycle + 1, self);
 
-                let memory_result = memory::fetch_word(self.pc, self);
-                if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
-                    print_state(self);
-                    println!(
-                        "0x{:x?}: 0x{:x?}",
-                        self.pc,
-                        memory_result.unwrap()
-                    );
-                }
-                if let Ok(byte_code) = memory_result {
-                    let instr = Instruction::from(byte_code)?;
-                    let ret = match instr {
-                        Instruction::R(x) => datapath::exec_r(self, &x),
-                        Instruction::I(x) => datapath::exec_i(self, &x),
-                        Instruction::U(x) => datapath::exec_u(self, &x),
-                        Instruction::J(x) => datapath::exec_j(self, &x),
-                        Instruction::S(x) => datapath::exec_s(self, &x),
-                        Instruction::B(x) => datapath::exec_b(self, &x),
-                    };
-                    match ret {
-                        Ok(State::Ok) => {}
-                        Ok(x) => return Ok(x),
-                        Err(ExecError::InstructionError(InstructionError::NoInstruction))
-                        | Err(ExecError::InstructionError(InstructionError::NotSupported)) => {
-                            println!("Not supported: 0x{:x}", byte_code);
-                            self.trap = 2;
-                            self.is_trap = true;
+                match memory::fetch_word(self.pc, self) {
+                    Ok(fetch_result) => {
+                        if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
+                            print_state(self);
+                            println!("0x{:x?}: 0x{:x?}", self.pc, fetch_result);
                         }
-                        Err(x) => return Err(x),
-                    };
-                    self.reg_file[0] = 0;
-                } else {
-                    // Instruction access fault
-                    self.trap = 1;
-                    self.is_trap = true;
-                }
+                        match Instruction::from(fetch_result) {
+                            Ok(instr) => {
+                                let ret = match instr {
+                                    Instruction::R(x) => datapath::exec_r(self, &x),
+                                    Instruction::I(x) => datapath::exec_i(self, &x),
+                                    Instruction::U(x) => datapath::exec_u(self, &x),
+                                    Instruction::J(x) => datapath::exec_j(self, &x),
+                                    Instruction::S(x) => datapath::exec_s(self, &x),
+                                    Instruction::B(x) => datapath::exec_b(self, &x),
+                                };
+                                match ret {
+                                    Ok(State::Ok) => {}
+                                    Ok(x) => return Ok(x),
+                                    Err(x) => {
+                                        self.trap = exception_number(x);
+                                        self.is_trap = true;
+                                    }
+                                };
+                            }
+                            Err(x) => {
+                                self.trap = exception_number(x);
+                                self.is_trap;
+                            }
+                        };
+                    }
+                    Err(x) => {
+                        self.trap = exception_number(x);
+                        self.is_trap;
+                    }
+                };
             }
         }
+
+        self.reg_file[0] = 0;
 
         if self.is_trap {
             // println!("it's a trap");
@@ -197,33 +167,29 @@ impl<'a> Core<'a> {
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
-                if self.trap & mideleg > 0{
+                if self.trap & mideleg > 0 {
                     self.s_mode_trap_handler();
-                }
-                else {
+                } else {
                     self.m_mode_trap_handler();
                 }
-            }
-            else{
+            } else {
                 // exception
                 let medeleg = csr::read(Csr::medeleg, self);
-                if self.trap & medeleg > 0{
+                if self.trap & medeleg > 0 {
                     self.s_mode_trap_handler();
-                }
-                else {
+                } else {
                     self.m_mode_trap_handler();
                 }
             }
-        }
-        else{
+        } else {
             let minstret = csr::read_64(Csr64::minstret, self);
-            csr::write_64(Csr64::minstret, minstret+1, self);
+            csr::write_64(Csr64::minstret, minstret + 1, self);
         }
 
         Ok(State::Ok)
     }
 
-    fn m_mode_trap_handler(&mut self){
+    fn m_mode_trap_handler(&mut self) {
         // Machine mode trap handler
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
@@ -269,7 +235,7 @@ impl<'a> Core<'a> {
         self.is_trap = false;
     }
 
-    fn s_mode_trap_handler(&mut self){
+    fn s_mode_trap_handler(&mut self) {
         // Supervisor mode trap handler
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
@@ -314,9 +280,8 @@ impl<'a> Core<'a> {
         self.trap = 0;
         self.is_trap = false;
     }
-
 }
-pub fn print_state(core: &Core)  {
+pub fn print_state(core: &Core) {
     println!(
         "Z:{:08x} ra:{:08x} sp:{:08x} gp:{:08x} tp:{:08x} t0:{:08x} t1:{:08x} t2:{:08x} s0:{:08x} s1:{:08x} a0:{:08x} a1:{:08x} a2:{:08x} a3:{:08x} a4:{:08x} a5:{:08x} a6:{:08x} a7:{:08x} s2:{:08x} s3:{:08x} s4:{:08x} s5:{:08x} s6:{:08x} s7:{:08x} s8:{:08x} s9:{:08x} s10:{:08x} s11:{:08x} t3:{:08x} t4:{:08x} t5:{:08x} t6:{:08x}",
         core.reg_file[0] as u32,
