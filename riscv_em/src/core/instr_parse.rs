@@ -1,6 +1,5 @@
-use std::{error::Error, fmt};
-
 use super::exceptions;
+use std::process;
 
 //register
 #[derive(Debug)]
@@ -257,8 +256,9 @@ impl Instruction {
             0b1101111 => Ok(Instruction::J(JType::from(byte_code))),
             0b0110111 | 0b0010111 => Ok(Instruction::U(UType::from(byte_code))),
             _ => {
-                println!("{opcode:b}");
-                println!("{byte_code:b}");
+                println!("opcode: 0b{opcode:b}");
+                println!("0x{byte_code:x}");
+                process::exit(1);
                 Err(exceptions::Exception::Illegal_instruction)
             }
         }

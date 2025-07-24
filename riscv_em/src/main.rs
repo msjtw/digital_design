@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             },
             Err(x) => {
-                println!("{:?}", x);
+                println!("err: {:?}", x);
                 break;
             }
         }

@@ -22,13 +22,15 @@ impl PmpCfg {
     }
 }
 
-pub fn pmp_check(addr: u32, len: u32, core: &Core) -> Option<super::MemoryPermissions> {
-    let pmpaddr0_addr = csr::csr_addr(csr::Csr::pmpaddr0) as u32;
-    let mut implemented = 0;
-    for i in 0..15 {
-        let pmpcfg = csr::read_pmpXcfg(i, core);
+pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
+    // return super::MemoryPermissions { r: true, w: true, x: true, };
+    let pmpaddr0_addr = csr::csr_addr(csr::Csr::pmpaddr0);
+    for i in 0..15usize {
+        let pmpcfg = csr::read_pmpXcfg(i as u32, core);
         let pmpcfg = PmpCfg::from(pmpcfg);
-        let pmpaddr = csr::read_addr(pmpaddr0_addr + i * 4, core);
+        let pmpaddr = core.csr_file[pmpaddr0_addr + i * 4];
+        let top;
+        let bot;
         match pmpcfg.a_mode {
             0b00 => {
                 // disabled; matches no addresses
@@ -36,43 +38,56 @@ pub fn pmp_check(addr: u32, len: u32, core: &Core) -> Option<super::MemoryPermis
             }
             0b01 => {
                 // TOR; top of range
-                implemented += 1;
-                let top = pmpaddr << 2;
-                let bot = match i {
+                println!("pmp TOR mode");
+                top = pmpaddr << 2;
+                bot = match i {
                     0 => 0,
-                    _ => csr::read_addr(pmpaddr0_addr + (i - 1) * 4, core),
+                    _ => core.csr_file[(pmpaddr0_addr + (i - 1) * 4) as usize],
                 };
-                if addr >= bot && addr + len <= top {
-                    // full match
-                    if pmpcfg.lock {
-                        return Some(super::MemoryPermissions{r: pmpcfg.r, w: pmpcfg.w, x:pmpcfg.x});
-                    }
-                    else {
-                        if core.mode == 3 {
-                            return Some(super::MemoryPermissions{r: true, w: true, x: true});
-                        }
-                        else {
-                            return Some(super::MemoryPermissions{r: pmpcfg.r, w: pmpcfg.w, x:pmpcfg.x});
-                        }
-                    }
-                } else if addr < bot && addr + len > bot || addr < top && addr + len > top {
-                    // partial match
-                    return None;
-                } else {
-                    // nomatch
-                    continue;
-                }
             }
             0b10 => {
                 // NA4: naturally aligned 4-byte region
-                implemented += 1;
+                bot = pmpaddr << 2;
+                top = bot + 4;
             }
             0b11 => {
                 // NAPOT: naturally aligned power-of-two region
-                implemented += 1;
+                let mut a = 1;
+                let mut pow = 0;
+                while pmpaddr & a == 0 {
+                    a <<= 1;
+                    pow += 1;
+                }
+                bot = (pmpaddr >> pow) << (pow + 2);
+                top = bot + (1 << (pow + 3));
             }
-            _ => {}
+            _ => {
+                top = 0;
+                bot = 0;
+            }
+        };
+        if addr >= bot && addr + len <= top {
+            // full match
+            if pmpcfg.lock {
+                return super::MemoryPermissions { r: pmpcfg.r, w: pmpcfg.w, x: pmpcfg.x, };
+            } else {
+                if core.mode == 3 {
+                    return super::MemoryPermissions { r: true, w: true, x: true, };
+                } else {
+                    return super::MemoryPermissions { r: pmpcfg.r, w: pmpcfg.w, x: pmpcfg.x, };
+                }
+            }
+        } else if addr < bot && addr + len > bot || addr < top && addr + len > top {
+            // partial match
+            return super::MemoryPermissions { r: false, w: false, x: false, };
+        } else {
+            // nomatch
+            continue;
         }
-    };
-    None
+    }
+
+    if core.mode == 3 {
+        return super::MemoryPermissions { r: true, w: true, x: true, };
+    }
+    return super::MemoryPermissions { r: false, w: false, x: false, };
 }

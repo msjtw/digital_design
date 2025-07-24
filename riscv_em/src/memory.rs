@@ -35,19 +35,23 @@ pub struct MemoryPermissions {
 }
 
 pub fn read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
-    let memory = &core.memory;
-    // if addr & 0b11 > 0 {
-    //     println!("{}", addr & 0b11);
-    //     return Err(4);
-    // }
+    let perm = pmp::pmp_check(addr, 4, core);
+    if !perm.r {
+        return Err(exceptions::Exception::Load_access_fault);
+    }
 
+    let memory = &core.memory;
+    
     if addr < memory.base_addr || addr > memory.memory_size {
         return match addr {
             0x1100bffc => Ok((core.mtime >> 32) as u32),
             0x1100bff8 => Ok(core.mtime as u32),
             0x11004004 => Ok((core.mtimecmp >> 32) as u32),
             0x11004000 => Ok(core.mtimecmp as u32),
-            _ => Ok(0),
+            _ => {
+                println!("Error! read:0x{:x}", addr);
+                Ok(0)
+            }
         };
     }
     let address = (addr - memory.base_addr) as usize;
@@ -58,13 +62,16 @@ pub fn read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
     Ok((a << 24) + (b << 16) + (c << 8) + d)
 }
 pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
-    let memory = &core.memory;
-    // if addr & 0b11 > 0 {
-    //     println!("{}", addr & 0b11);
-    //     return Err(4);
-    // }
+    let perm = pmp::pmp_check(addr, 4, core);
+    if !perm.x {
+        return Err(exceptions::Exception::Instruction_access_fault);
+    }
 
+    let memory = &core.memory;
+    
+    // print!("0x{:x} - 0x{:x} ", addr, memory.base_addr);
     let address = (addr - memory.base_addr) as usize;
+    // println!("= 0x{:x}", address);
     let d = memory.data[address] as u32;
     let c = memory.data[address + 1] as u32;
     let b = memory.data[address + 2] as u32;
@@ -73,17 +80,26 @@ pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> 
 }
 
 pub fn read_hword(addr: u32, core: &Core) -> Result<u16, exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 2, core);
+    if !perm.r {
+        return Err(exceptions::Exception::Load_access_fault);
+    }
+
     let memory = &core.memory;
-    // if addr & 0b1 > 0 {
-    //     return Err(4);
-    // }
+    
     let address = (addr - memory.base_addr) as usize;
     let b = memory.data[address] as u16;
     let a = memory.data[address + 1] as u16;
     Ok((a << 8) + b)
 }
 pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 1, core);
+    if !perm.r {
+        return Err(exceptions::Exception::Load_access_fault);
+    }
+
     let memory = &mut core.memory;
+    
     if addr < memory.base_addr || addr > memory.memory_size {
         return match addr {
             // read uart byte
@@ -98,7 +114,10 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
                 let ret = 0x60 | bytes_to_read;
                 Ok(ret)
             }
-            _ => Ok(0),
+            _ => {
+                println!("Error! read:0x{:x}", addr);
+                Ok(0)
+            }
         };
     }
     let address = (addr - memory.base_addr) as usize;
@@ -106,10 +125,12 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
 }
 
 pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 4, core);
+    if !perm.w {
+        return Err(exceptions::Exception::Load_access_fault);
+    }
+
     let memory = &mut core.memory;
-    // if addr & 0b11 > 0 {
-    //     return Err(6);
-    // }
 
     if addr < memory.base_addr {
         match addr {
@@ -138,7 +159,7 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
         return Ok(0);
     }
     let address = (addr - memory.base_addr) as usize;
-    // println!("{:x} {:x}", addr, addr - memory.base_addr);
+    // println!("0x{:x} - 0x{:x} = 0x{:x}", addr, memory.base_addr, address);
     let mask: u32 = (1 << 8) - 1;
     let d: u8 = (data & mask) as u8;
     let c: u8 = ((data & mask << 8) >> 8) as u8;
@@ -151,13 +172,13 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
     Ok(0)
 }
 pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 2, core);
+    if !perm.w {
+        return Err(exceptions::Exception::Load_access_fault);
+    }
+
     let memory = &mut core.memory;
-    // if addr & 0b1 > 0 {
-    //     return Err(6);
-    // }
-    // if addr < memory.base_addr {
-    //     return Err(7);
-    // }
+
     let address = (addr - memory.base_addr) as usize;
     let mask: u16 = (2 << 8) - 1;
     let d: u8 = (data & mask) as u8;
@@ -167,15 +188,23 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
     Ok(())
 }
 pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 1, core);
+    if !perm.w {
+        return Err(exceptions::Exception::Load_access_fault);
+    }
+
     let memory = &mut core.memory;
+
     if addr < memory.base_addr {
         match addr {
             0x10000000 => {
                 print!("{}", data as char);
-                std::io::stdout().flush();
+                let _ = std::io::stdout().flush();
             } // TODO: UART;
             0x11100000 => {} // TODO: SYSCON;
-            _ => {}
+            _ => {
+                println!("Error! read:0x{:x}", addr);
+            }
         };
         return Ok(());
     }

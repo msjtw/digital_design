@@ -76,7 +76,7 @@ impl<'a> Core<'a> {
             );
         }
 
-        self.pc = super::RAM_OFFSET;
+        self.pc = 0x80000000;
         self.reg_file[10] = 0x00; // hart ID
         self.reg_file[11] = (super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32) as i32;
         self.mode = 3;

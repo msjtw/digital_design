@@ -352,12 +352,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
         }
         //jalr
         0b1100111 => {
-            // println!(
-            //     "{} + {} = {}",
-            //     core.reg_file[1] as u32,
-            //     i64::from(instr.imm),
-            //     (i64::from(core.reg_file[instr.rs1 as usize] as u32) + i64::from(instr.imm)) as u32
-            // );
             let tmp_pc = core.pc;
             core.pc =
                 (i64::from(core.reg_file[instr.rs1 as usize] as u32) + i64::from(instr.imm)) as u32;
@@ -366,40 +360,37 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
         0b1110011 => {
             let imm = (instr.imm & 4095) as u32;
             let reg = core.reg_file[instr.rs1 as usize] as u32;
-            let csr = csr::read_addr(imm, core);
+            let csr = csr::read_addr(imm, core)?;
             core.reg_file[instr.rd as usize] = csr as i32;
-            if super::super::DEBUG {
-                println!("csr adr:{:x}, reg:{:x}, csr:{:x}", imm, reg, csr);
-            }
             match instr.funct3 {
                 // csrrw
                 0b001 => {
-                    csr::write_addr(imm, reg, core);
+                    csr::write_addr(imm, reg, core)?;
                     core.pc += 4;
                 }
                 // csrrs
                 0b010 => {
-                    csr::write_addr(imm, csr | reg, core);
+                    csr::write_addr(imm, csr | reg, core)?;
                     core.pc += 4;
                 }
                 // csrrc
                 0b011 => {
-                    csr::write_addr(imm, csr & !reg, core);
+                    csr::write_addr(imm, csr & !reg, core)?;
                     core.pc += 4;
                 }
                 // csrrwi
                 0b101 => {
-                    csr::write_addr(imm, instr.rs1, core);
+                    csr::write_addr(imm, instr.rs1, core)?;
                     core.pc += 4;
                 }
                 // csrrsi
                 0b110 => {
-                    csr::write_addr(imm, csr | instr.rs1, core);
+                    csr::write_addr(imm, csr | instr.rs1, core)?;
                     core.pc += 4;
                 }
                 // csrrci
                 0b111 => {
-                    csr::write_addr(imm, csr & !instr.rs1, core);
+                    csr::write_addr(imm, csr & !instr.rs1, core)?;
                     core.pc += 4;
                 }
                 0b0 => {
