@@ -38,12 +38,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         ctr += 1;
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros() as u64;
-        proc.mtime = now;
+        proc.mtime = ctr;
 
         match proc.exec() {
             Ok(x) => match x {
                 core::State::Ok => {}
                 core::State::Sleep => {
+                    println!("Sleep...");
                     // let add_time = (proc.memory.csr_read(memory::Time::Mtimecmp) as i64
                     //     - proc.memory.csr_read(memory::Time::Mtime) as i64)
                     //     .max(0) as u32;
@@ -67,7 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        if DEBUG && ctr > 1e6 as u32 {
+        if DEBUG && ctr > 1e6 as u64 {
             break;
         }
     }

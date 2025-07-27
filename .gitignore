@@ -8,4 +8,4 @@ vcd_dump/
 elf_test/
 riscv_em/target
 buildroot/
-
+gdb.txt

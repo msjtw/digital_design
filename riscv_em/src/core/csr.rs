@@ -43,6 +43,7 @@ pub fn write_pmpXcfg(n: u32, data: u8, core: &mut Core) {
 }
 
 pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
+    // println!("csr read: 0x{:x}", addr);
     for laddr in LEGAL_ADRESSES {
         if laddr == addr {
             return Ok(core.csr_file[addr as usize]);
@@ -53,6 +54,7 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
 }
 
 pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception> {
+    // println!("csr write: 0x{:x}", addr);
     for laddr in LEGAL_ADRESSES {
         if laddr == addr {
             core.csr_file[addr as usize] = data;

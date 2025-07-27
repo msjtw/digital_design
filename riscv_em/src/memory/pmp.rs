@@ -23,14 +23,13 @@ impl PmpCfg {
 }
 
 pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
-    // return super::MemoryPermissions { r: true, w: true, x: true, };
     let pmpaddr0_addr = csr::csr_addr(csr::Csr::pmpaddr0);
     for i in 0..15usize {
         let pmpcfg = csr::read_pmpXcfg(i as u32, core);
         let pmpcfg = PmpCfg::from(pmpcfg);
-        let pmpaddr = core.csr_file[pmpaddr0_addr + i * 4];
-        let top;
-        let bot;
+        let pmpaddr = core.csr_file[pmpaddr0_addr + i * 4] as u64;
+        let top: u64;
+        let bot: u64;
         match pmpcfg.a_mode {
             0b00 => {
                 // disabled; matches no addresses
@@ -38,11 +37,10 @@ pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
             }
             0b01 => {
                 // TOR; top of range
-                println!("pmp TOR mode");
                 top = pmpaddr << 2;
                 bot = match i {
                     0 => 0,
-                    _ => core.csr_file[(pmpaddr0_addr + (i - 1) * 4) as usize],
+                    _ => core.csr_file[(pmpaddr0_addr + (i - 1) * 4) as usize] as u64,
                 };
             }
             0b10 => {
@@ -52,6 +50,7 @@ pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
             }
             0b11 => {
                 // NAPOT: naturally aligned power-of-two region
+                // println!("pmp NAPOT mode");
                 let mut a = 1;
                 let mut pow = 0;
                 while pmpaddr & a == 0 {
@@ -59,6 +58,8 @@ pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
                     pow += 1;
                 }
                 bot = (pmpaddr >> pow) << (pow + 2);
+                // println!("pmpaddr: 0x{:x}", pmpaddr);
+                // println!("pow: {}, bot: 0x{:x}, size: 0x{:x}", pow, bot, (1 << (pow + 3)));
                 top = bot + (1 << (pow + 3));
             }
             _ => {
@@ -66,6 +67,8 @@ pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
                 bot = 0;
             }
         };
+        let bot = bot as u32;
+        let top = top as u32;
         if addr >= bot && addr + len <= top {
             // full match
             if pmpcfg.lock {

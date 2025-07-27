@@ -6,7 +6,7 @@ mod instr_parse;
 use crate::memory::{self};
 use csr::{Csr, Csr64};
 use exceptions::*;
-use instr_parse::{Instruction};
+use instr_parse::Instruction;
 use std::{fs, u32};
 
 #[derive(Debug)]
@@ -62,24 +62,26 @@ impl<'a> Core<'a> {
         kernel: &str,
         dtb: &str,
     ) -> Result<(), Box<dyn std::error::Error + 'static>> {
+        self.mode = 3;
+
+        // kernel
         let data = fs::read(kernel)?;
         for i in 0..data.len() {
-            let _ = memory::write_byte(i as u32 + super::RAM_OFFSET, data[i], self);
+            let _ = memory::write_byte(super::RAM_OFFSET + i as u32, data[i], self);
         }
 
+        //8 byte alligned DTB
+        let mut dtb_addr = super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32;
+        dtb_addr >>= 3;
+        dtb_addr <<= 3;
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
-            let _ = memory::write_byte(
-                super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32 + i as u32,
-                data[i],
-                self,
-            );
+            let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
         }
 
         self.pc = 0x80000000;
         self.reg_file[10] = 0x00; // hart ID
-        self.reg_file[11] = (super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32) as i32;
-        self.mode = 3;
+        self.reg_file[11] = dtb_addr as i32;
         csr::write(Csr::misa, 0b01000000000010000001000100000001, self);
         //                             zyxvwutsrponmlkjihgfedcba
         Ok(())
@@ -124,7 +126,8 @@ impl<'a> Core<'a> {
                     Ok(fetch_result) => {
                         if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
                             print_state(self);
-                            println!("0x{:x?}: 0x{:x?}", self.pc, fetch_result);
+                            println!("0x{:x?}: 0x{:08x?}", self.pc, fetch_result);
+                            // print_state_gdb(self);
                         }
                         match Instruction::from(fetch_result) {
                             Ok(instr) => {
@@ -162,7 +165,6 @@ impl<'a> Core<'a> {
         self.reg_file[0] = 0;
 
         if self.is_trap {
-            // println!("it's a trap");
             // println!("{}", self.trap);
             if (self.trap as i32) < 0 {
                 //interrupt
@@ -316,5 +318,42 @@ pub fn print_state(core: &Core) {
         core.reg_file[29] as u32,
         core.reg_file[30] as u32,
         core.reg_file[31] as u32,
+    );
+}
+pub fn print_state_gdb(core: &Core) {
+    println!(
+        "ra: 0x{:x}\nsp: 0x{:x}\ngp: 0x{:x}\ntp: 0x{:x}\nt0: 0x{:x}\nt1: 0x{:x}\nt2: 0x{:x}\nfp: 0x{:x}\ns1: 0x{:x}\na0: 0x{:x}\na1: 0x{:x}\na2: 0x{:x}\na3: 0x{:x}\na4: 0x{:x}\na5: 0x{:x}\na6: 0x{:x}\na7: 0x{:x}\ns2: 0x{:x}\ns3: 0x{:x}\ns4: 0x{:x}\ns5: 0x{:x}\ns6: 0x{:x}\ns7: 0x{:x}\ns8: 0x{:x}\ns9: 0x{:x}\ns10: 0x{:x}\ns11: 0x{:x}\nt3: 0x{:x}\nt4: 0x{:x}\nt5: 0x{:x}\nt6: 0x{:x}\npc: 0x{:x}",
+        core.reg_file[1] as u32,
+        core.reg_file[2] as u32,
+        core.reg_file[3] as u32,
+        core.reg_file[4] as u32,
+        core.reg_file[5] as u32,
+        core.reg_file[6] as u32,
+        core.reg_file[7] as u32,
+        core.reg_file[8] as u32,
+        core.reg_file[9] as u32,
+        core.reg_file[10] as u32,
+        core.reg_file[11] as u32,
+        core.reg_file[12] as u32,
+        core.reg_file[13] as u32,
+        core.reg_file[14] as u32,
+        core.reg_file[15] as u32,
+        core.reg_file[16] as u32,
+        core.reg_file[17] as u32,
+        core.reg_file[18] as u32,
+        core.reg_file[19] as u32,
+        core.reg_file[20] as u32,
+        core.reg_file[21] as u32,
+        core.reg_file[22] as u32,
+        core.reg_file[23] as u32,
+        core.reg_file[24] as u32,
+        core.reg_file[25] as u32,
+        core.reg_file[26] as u32,
+        core.reg_file[27] as u32,
+        core.reg_file[28] as u32,
+        core.reg_file[29] as u32,
+        core.reg_file[30] as u32,
+        core.reg_file[31] as u32,
+        core.pc,
     );
 }
