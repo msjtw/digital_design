@@ -1,7 +1,7 @@
 use super::{exceptions::Exception, Core};
 use crate::memory;
 
-static LEGAL_ADRESSES: [u32; 60] = [0x340, 0x140, 0xC00, 0xC80, 0xC01, 0xC81, 0xC02, 0xC82, 0xB00, 0xB80, 0xB02, 0xB82, 0x320, 0x306, 0x106, 0x344, 0x144, 0x304, 0x104, 0x305, 0x105, 0x341, 0x141, 0x342, 0x142, 0x343, 0x143, 0x302, 0x312, 0x303, 0x300, 0x310, 0x100, 0x180, 0x301, 0xF14, 0x3A0, 0x3A1, 0x3A2, 0x3A3, 0x3B0, 0x3B1, 0x3B2, 0x3B3, 0x3B4, 0x3B5, 0x3B6, 0x3B7, 0x3B8, 0x3B9, 0x3BA, 0x3BB, 0x3BC, 0x3BD, 0x3BE, 0x3BF, 0xf11, 0xf12, 0xf13, 0x0];
+static LEGAL_ADRESSES: [u32; 61] = [0x340, 0x140, 0xC00, 0xC80, 0xC01, 0xC81, 0xC02, 0xC82, 0xB00, 0xB80, 0xB02, 0xB82, 0x320, 0x306, 0x106, 0x344, 0x144, 0x304, 0x104, 0x305, 0x105, 0x341, 0x141, 0x342, 0x142, 0x343, 0x143, 0x302, 0x312, 0x303, 0x300, 0x310, 0x100, 0x180, 0x301, 0xF14, 0x3A0, 0x3A1, 0x3A2, 0x3A3, 0x3B0, 0x3B1, 0x3B2, 0x3B3, 0x3B4, 0x3B5, 0x3B6, 0x3B7, 0x3B8, 0x3B9, 0x3BA, 0x3BB, 0x3BC, 0x3BD, 0x3BE, 0x3BF, 0xf11, 0xf12, 0xf13, 0xf14, 0x0];
 
 pub fn read(csr: Csr, core: &Core) -> u32 {
     let addr = csr_addr(csr);
@@ -43,18 +43,28 @@ pub fn write_pmpXcfg(n: u32, data: u8, core: &mut Core) {
 }
 
 pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
-    // println!("csr read: 0x{:x}", addr);
+    // println!("csr read: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
+    let perm = permissions(addr);
+    if perm.mode > core.mode {
+        println!("Error csr read: 0x{:x}; No permisions {:?}", addr, perm);
+        return Err(Exception::Illegal_instruction);
+    }
     for laddr in LEGAL_ADRESSES {
         if laddr == addr {
             return Ok(core.csr_file[addr as usize]);
         }
     }
-    println!("Error csr read: 0x{:x}", addr);
+    println!("Error csr read: 0x{:x}; Illegal address", addr);
     Err(Exception::Illegal_instruction)
 }
 
 pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception> {
-    // println!("csr write: 0x{:x}", addr);
+    // println!("csr write: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
+    let perm = permissions(addr);
+    if perm.mode > core.mode || !perm.w {
+        println!("Error csr write: 0x{:x} 0x{:x}; No permisions: {:?}", addr, data, perm);
+        return Err(Exception::Illegal_instruction)
+    }
     for laddr in LEGAL_ADRESSES {
         if laddr == addr {
             core.csr_file[addr as usize] = data;
@@ -62,7 +72,7 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
             return Ok(())
         }
     }
-    println!("Error csr write: 0x{:x}", addr);
+    println!("Error csr write: 0x{:x}; Illegal address", addr);
     Err(Exception::Illegal_instruction)
 }
 
@@ -158,9 +168,9 @@ fn mirror(core: &mut Core) {
     //hmpcounters?
 
     // sip, sie
-    let mie = read(Csr::mie, core);
-    let mip = read(Csr::mip, core);
-    let mideleg = read(Csr::mideleg, core);
+    let mie = core.csr_file[csr_addr(Csr::mie)];
+    let mip = core.csr_file[csr_addr(Csr::mip)];
+    let mideleg = core.csr_file[csr_addr(Csr::mideleg)];
     core.csr_file[csr_addr(Csr::sie)] = mie & mideleg;
     core.csr_file[csr_addr(Csr::sip)] = mip & mideleg;
 }

@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Ok(x) => match x {
                 core::State::Ok => {}
                 core::State::Sleep => {
-                    println!("Sleep...");
+                    // println!("Sleep...");
                     // let add_time = (proc.memory.csr_read(memory::Time::Mtimecmp) as i64
                     //     - proc.memory.csr_read(memory::Time::Mtime) as i64)
                     //     .max(0) as u32;

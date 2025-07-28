@@ -358,39 +358,63 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
             core.reg_file[instr.rd as usize] = (tmp_pc + 4) as i32;
         }
         0b1110011 => {
-            let imm = (instr.imm & 4095) as u32;
-            let reg = core.reg_file[instr.rs1 as usize] as u32;
-            let csr = csr::read_addr(imm, core)?;
-            core.reg_file[instr.rd as usize] = csr as i32;
+            let csr_addr = (instr.imm & 0xfff ) as u32;
+            let source = core.reg_file[instr.rs1 as usize] as u32;
             match instr.funct3 {
                 // csrrw
                 0b001 => {
-                    csr::write_addr(imm, reg, core)?;
+                    let mut csr = 0;
+                    if instr.rd != 0 {
+                        csr = csr::read_addr(csr_addr, core)?;
+                    }
+                    core.reg_file[instr.rd as usize] = csr as i32;
+                    csr::write_addr(csr_addr, source, core)?;
                     core.pc += 4;
                 }
                 // csrrs
                 0b010 => {
-                    csr::write_addr(imm, csr | reg, core)?;
+                    let csr = csr::read_addr(csr_addr, core)?;
+                    core.reg_file[instr.rd as usize] = csr as i32;
+                    if instr.rs1 != 0 {
+                        csr::write_addr(csr_addr, csr | source, core)?;
+                    }
                     core.pc += 4;
                 }
                 // csrrc
                 0b011 => {
-                    csr::write_addr(imm, csr & !reg, core)?;
+                    let csr = csr::read_addr(csr_addr, core)?;
+                    core.reg_file[instr.rd as usize] = csr as i32;
+                    if instr.rs1 != 0 {
+                        csr::write_addr(csr_addr, csr & !source, core)?;
+                    }
                     core.pc += 4;
                 }
                 // csrrwi
                 0b101 => {
-                    csr::write_addr(imm, instr.rs1, core)?;
+                    let mut csr = 0;
+                    if instr.rd != 0 {
+                        csr = csr::read_addr(csr_addr, core)?;
+                    }
+                    core.reg_file[instr.rd as usize] = csr as i32;
+                    csr::write_addr(csr_addr, instr.rs1, core)?;
                     core.pc += 4;
                 }
                 // csrrsi
                 0b110 => {
-                    csr::write_addr(imm, csr | instr.rs1, core)?;
+                    let csr = csr::read_addr(csr_addr, core)?;
+                    core.reg_file[instr.rd as usize] = csr as i32;
+                    if instr.rs1 != 0 {
+                        csr::write_addr(csr_addr, csr | instr.rs1, core)?;
+                    }
                     core.pc += 4;
                 }
                 // csrrci
                 0b111 => {
-                    csr::write_addr(imm, csr & !instr.rs1, core)?;
+                    let csr = csr::read_addr(csr_addr, core)?;
+                    core.reg_file[instr.rd as usize] = csr as i32;
+                    if instr.rs1 != 0 {
+                        csr::write_addr(csr_addr, csr & !instr.rs1, core)?;
+                    }
                     core.pc += 4;
                 }
                 0b0 => {
@@ -402,7 +426,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                                 return Err(Exception::Environment_call_from_Mmode);
                             } else if core.mode == 1 {
                                 // supervisor ecall
-                                println!("sbi ecall unimplemeted");
                                 return Err(Exception::Environment_call_from_Smode);
                             } else if core.mode == 0 {
                                 // user ecall

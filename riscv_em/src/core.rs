@@ -82,7 +82,7 @@ impl<'a> Core<'a> {
         self.pc = 0x80000000;
         self.reg_file[10] = 0x00; // hart ID
         self.reg_file[11] = dtb_addr as i32;
-        csr::write(Csr::misa, 0b01000000000010000001000100000001, self);
+        csr::write(Csr::misa, 0b01000000000010100001000100000001, self);
         //                             zyxvwutsrponmlkjihgfedcba
         Ok(())
     }
@@ -125,7 +125,7 @@ impl<'a> Core<'a> {
                 match memory::fetch_word(self.pc, self) {
                     Ok(fetch_result) => {
                         if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
-                            print_state(self);
+                            // print_state(self);
                             println!("0x{:x?}: 0x{:08x?}", self.pc, fetch_result);
                             // print_state_gdb(self);
                         }
@@ -165,11 +165,12 @@ impl<'a> Core<'a> {
         self.reg_file[0] = 0;
 
         if self.is_trap {
+            println!("it's a trap {} 0x{:x}", self.mode, self.trap);
             // println!("{}", self.trap);
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
-                if self.trap & mideleg > 0 {
+                if self.trap & mideleg > 0 && self.mode < 3 {
                     self.s_mode_trap_handler();
                 } else {
                     self.m_mode_trap_handler();
@@ -177,7 +178,7 @@ impl<'a> Core<'a> {
             } else {
                 // exception
                 let medeleg = csr::read(Csr::medeleg, self);
-                if self.trap & medeleg > 0 {
+                if self.trap & medeleg > 0 && self.mode < 3 {
                     self.s_mode_trap_handler();
                 } else {
                     self.m_mode_trap_handler();
@@ -193,6 +194,7 @@ impl<'a> Core<'a> {
 
     fn m_mode_trap_handler(&mut self) {
         // Machine mode trap handler
+        // println!("mmode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("mmode trap");
@@ -239,6 +241,7 @@ impl<'a> Core<'a> {
 
     fn s_mode_trap_handler(&mut self) {
         // Supervisor mode trap handler
+        // println!("smode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("smode trap");
