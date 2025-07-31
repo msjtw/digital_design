@@ -74,16 +74,22 @@ impl<'a> Core<'a> {
         let mut dtb_addr = super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32;
         dtb_addr >>= 3;
         dtb_addr <<= 3;
+        dtb_addr = 0x83e00000;
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
             let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
         }
 
+        // println!("dtb addr: 0x{:x}", dtb_addr);
+
         self.pc = 0x80000000;
+        self.reg_file[5] = 0x80000000u32 as i32;
         self.reg_file[10] = 0x00; // hart ID
         self.reg_file[11] = dtb_addr as i32;
-        csr::write(Csr::misa, 0b01000000000010100001000100000001, self);
-        //                             zyxvwutsrponmlkjihgfedcba
+        self.reg_file[12] = 0x1028;
+        //qemu:               0b01000000000101000001000110101101
+        csr::write(Csr::misa, 0b01000000000101000001000100000001, self);
+        //                            zyxvwutsrqponmlkjihgfedcba
         Ok(())
     }
 
@@ -127,7 +133,9 @@ impl<'a> Core<'a> {
                         if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
                             // print_state(self);
                             println!("0x{:x?}: 0x{:08x?}", self.pc, fetch_result);
-                            // print_state_gdb(self);
+                            if self.mtime > 788381 - 5{
+                                print_state_gdb(self);
+                            }
                         }
                         match Instruction::from(fetch_result) {
                             Ok(instr) => {
@@ -165,7 +173,7 @@ impl<'a> Core<'a> {
         self.reg_file[0] = 0;
 
         if self.is_trap {
-            println!("it's a trap {} 0x{:x}", self.mode, self.trap);
+            // println!("it's a trap {} 0x{:x}", self.mode, self.trap);
             // println!("{}", self.trap);
             if (self.trap as i32) < 0 {
                 //interrupt

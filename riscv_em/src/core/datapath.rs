@@ -271,18 +271,18 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 //slli
                 0x1 => {
                     core.reg_file[instr.rd as usize] =
-                        core.reg_file[instr.rs1 as usize] << (instr.imm & 31);
+                        core.reg_file[instr.rs1 as usize] << (instr.imm & 0b11111);
                 }
                 0x5 => match instr.funct7 {
                     //srli
                     0x00 => {
                         core.reg_file[instr.rd as usize] =
-                            (core.reg_file[instr.rs1 as usize] as u32 >> (instr.imm & 31)) as i32;
+                            (core.reg_file[instr.rs1 as usize] as u32 >> (instr.imm & 0b11111)) as i32;
                     }
                     //srai
                     0x20 => {
                         core.reg_file[instr.rd as usize] =
-                            core.reg_file[instr.rs1 as usize] >> (instr.imm & 31);
+                            core.reg_file[instr.rs1 as usize] >> (instr.imm & 0b11111);
                     }
                     _ => return Err(Exception::Illegal_instruction),
                 },
@@ -363,6 +363,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
             match instr.funct3 {
                 // csrrw
                 0b001 => {
+                    // print!("csrrw: ");
                     let mut csr = 0;
                     if instr.rd != 0 {
                         csr = csr::read_addr(csr_addr, core)?;
@@ -373,6 +374,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrs
                 0b010 => {
+                    // print!("csrrs: ");
                     let csr = csr::read_addr(csr_addr, core)?;
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
@@ -382,6 +384,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrc
                 0b011 => {
+                    // print!("csrrc: ");
                     let csr = csr::read_addr(csr_addr, core)?;
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
@@ -391,6 +394,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrwi
                 0b101 => {
+                    // print!("csrrwi: ");
                     let mut csr = 0;
                     if instr.rd != 0 {
                         csr = csr::read_addr(csr_addr, core)?;
@@ -401,6 +405,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrsi
                 0b110 => {
+                    // print!("csrrsi: ");
                     let csr = csr::read_addr(csr_addr, core)?;
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
@@ -410,6 +415,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrci
                 0b111 => {
+                    // print!("csrrci: ");
                     let csr = csr::read_addr(csr_addr, core)?;
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
@@ -421,6 +427,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     match instr.imm {
                         //ecall
                         0b0 => {
+                            println!("ecall");
                             if core.mode == 3 {
                                 // machine ecall
                                 return Err(Exception::Environment_call_from_Mmode);

@@ -43,7 +43,7 @@ pub fn read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
 
     let memory = &core.memory;
     
-    if addr < memory.base_addr || addr > memory.memory_size {
+    if addr < memory.base_addr {
         return match addr {
             0x1100bffc => Ok((core.mtime >> 32) as u32),
             0x1100bff8 => Ok(core.mtime as u32),
@@ -70,10 +70,6 @@ pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> 
     }
 
     let memory = &core.memory;
-
-    if addr < memory.base_addr {
-        println!("4 Error! read:0x{:x}", addr);
-    }
     
     let address = (addr - memory.base_addr) as usize;
     let d = memory.data[address] as u32;
@@ -110,7 +106,7 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
 
     let memory = &mut core.memory;
     
-    if addr < memory.base_addr || addr > memory.memory_size {
+    if addr < memory.base_addr {
         return match addr {
             // read uart byte
             0x10000000 => Ok(memory.read_byte),
