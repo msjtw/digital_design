@@ -15,7 +15,7 @@ pub enum Exception {
     Instruction_page_fault,
     Load_page_fault,
     StoreAMO_page_fault,
-    Hardware_error
+    Hardware_error,
 }
 
 pub fn exception_number(exc: Exception) -> u32 {

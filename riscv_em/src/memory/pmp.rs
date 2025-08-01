@@ -50,10 +50,10 @@ pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
             }
             0b11 => {
                 // NAPOT: naturally aligned power-of-two region
-                // println!("pmp NAPOT mode");
+                // println!("pmp NAPOT mode: 0x{:x}", pmpaddr);
                 let mut a = 1;
-                let mut pow = 0;
-                while pmpaddr & a == 0 {
+                let mut pow: i32 = 0;
+                while !pmpaddr & a == 1 {
                     a <<= 1;
                     pow += 1;
                 }

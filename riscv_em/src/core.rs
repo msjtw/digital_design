@@ -74,7 +74,6 @@ impl<'a> Core<'a> {
         let mut dtb_addr = super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32;
         dtb_addr >>= 3;
         dtb_addr <<= 3;
-        dtb_addr = 0x83e00000;
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
             let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
@@ -87,9 +86,10 @@ impl<'a> Core<'a> {
         self.reg_file[10] = 0x00; // hart ID
         self.reg_file[11] = dtb_addr as i32;
         self.reg_file[12] = 0x1028;
-        //qemu:               0b01000000000101000001000110101101
         csr::write(Csr::misa, 0b01000000000101000001000100000001, self);
         //                            zyxvwutsrqponmlkjihgfedcba
+        //                            Spent a whole week looking for a problem,
+        //                            ... I missed q in alphabet.
         Ok(())
     }
 
