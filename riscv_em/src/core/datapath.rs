@@ -427,15 +427,17 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     match instr.imm {
                         //ecall
                         0b0 => {
-                            println!("ecall");
                             if core.mode == 3 {
                                 // machine ecall
+                                // println!("ecall M");
                                 return Err(Exception::Environment_call_from_Mmode);
                             } else if core.mode == 1 {
                                 // supervisor ecall
+                                // println!("ecall S");
                                 return Err(Exception::Environment_call_from_Smode);
                             } else if core.mode == 0 {
                                 // user ecall
+                                // println!("ecall U");
                                 return Err(Exception::Environment_call_from_Umode);
                             }
                             // core.pc += 4;
@@ -450,6 +452,11 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                             let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set mpp = 0
                             core.mode = (mstatus >> 11) & 0b11;
+                            if core.mode < 3 {
+                                let mut mstatus = csr::read(super::Csr::mstatus, core);
+                                mstatus = !(1 << 17) & mstatus;
+                                csr::write(super::Csr::mstatus, mstatus, core);
+                            }
                             mstatus &= !(0b11 << 11);
                             // restore mie and set mpie to 1
                             mstatus &= !0b1000;
@@ -464,6 +471,11 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                             let mut sstatus = csr::read(super::Csr::sstatus, core);
                             // restore last mode and set spp = 0
                             core.mode = (sstatus >> 8) & 0b1;
+                            if core.mode < 3 {
+                                let mut mstatus = csr::read(super::Csr::mstatus, core);
+                                mstatus = !(1 << 17) & mstatus;
+                                csr::write(super::Csr::mstatus, mstatus, core);
+                            }
                             sstatus &= !(0b1 << 8);
                             // restore sie and set spie to 1
                             sstatus &= !0b10;

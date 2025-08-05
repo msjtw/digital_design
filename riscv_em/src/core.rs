@@ -90,6 +90,8 @@ impl<'a> Core<'a> {
         //                            zyxvwutsrqponmlkjihgfedcba
         //                            Spent a whole week looking for a problem,
         //                            ... I missed q in alphabet.
+        csr::write(Csr::menvcfgh, 0b00010000000000000000000000000000, self);
+        csr::write(Csr::menvcfg,  0b00000000000000000000000000000000, self);
         Ok(())
     }
 
@@ -133,7 +135,7 @@ impl<'a> Core<'a> {
                         if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
                             // print_state(self);
                             println!("0x{:x?}: 0x{:08x?}", self.pc, fetch_result);
-                            if self.mtime > 788381 - 5{
+                            if self.mtime > 788381 - 5 {
                                 print_state_gdb(self);
                             }
                         }
@@ -174,7 +176,8 @@ impl<'a> Core<'a> {
 
         if self.is_trap {
             // println!("it's a trap {} 0x{:x}", self.mode, self.trap);
-            // println!("{}", self.trap);
+            // println!("midelg {:b}", csr::read(Csr::mideleg, self));
+            // println!("medelg {:b}", csr::read(Csr::medeleg, self));
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
@@ -186,7 +189,7 @@ impl<'a> Core<'a> {
             } else {
                 // exception
                 let medeleg = csr::read(Csr::medeleg, self);
-                if self.trap & medeleg > 0 && self.mode < 3 {
+                if (1 << self.trap) & medeleg > 0 && self.mode < 3 {
                     self.s_mode_trap_handler();
                 } else {
                     self.m_mode_trap_handler();
@@ -238,7 +241,24 @@ impl<'a> Core<'a> {
         // save pc
         csr::write(Csr::mepc, self.pc, self);
         // jump to handler
-        self.pc = csr::read(Csr::mtvec, self);
+        let mtvec = csr::read(Csr::mtvec, self);
+        if mtvec & 0b11 != 0 {
+            println!("mtvec vectored mode")
+        }
+        match mtvec & 0b11 {
+            0 => self.pc = mtvec,
+            1 => {
+                if (self.trap as i32) < 0 {
+                    // interrupt
+                    self.pc = (mtvec >> 2) << 2;
+                    self.pc += 4 * ((self.trap << 1) >> 1);
+                } else {
+                    // exception
+                    self.pc = (mtvec >> 2) << 2;
+                }
+            }
+            _ => self.pc = 0,
+        }
 
         // enter machine mode
         self.mode = 3;

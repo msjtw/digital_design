@@ -86,14 +86,12 @@ impl Into<u32> for PA {
     }
 }
 
-pub fn translate(
-    virt_a: u32,
-    core: &Core,
-) -> Result<(u32, MemoryPermissions), Option<exceptions::Exception>> {
+pub fn translate( virt_a: u32, core: &Core,) -> Result<(u32, MemoryPermissions), Option<exceptions::Exception>> {
     let satp = csr::read(csr::Csr::satp, core);
     let satp = SATP::from(satp);
 
     if satp.mode == 0 {
+
         return Ok((
             virt_a,
             MemoryPermissions { r: true, w: true, x: true, },

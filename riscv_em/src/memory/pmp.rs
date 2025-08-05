@@ -23,11 +23,12 @@ impl PmpCfg {
 }
 
 pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
+    // return super::MemoryPermissions { r: true, w: true, x: true, };
     let pmpaddr0_addr = csr::csr_addr(csr::Csr::pmpaddr0);
     for i in 0..15usize {
         let pmpcfg = csr::read_pmpXcfg(i as u32, core);
         let pmpcfg = PmpCfg::from(pmpcfg);
-        let pmpaddr = core.csr_file[pmpaddr0_addr + i * 4] as u64;
+        let pmpaddr = core.csr_file[pmpaddr0_addr + i] as u64;
         let top: u64;
         let bot: u64;
         match pmpcfg.a_mode {
@@ -50,17 +51,17 @@ pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
             }
             0b11 => {
                 // NAPOT: naturally aligned power-of-two region
-                // println!("pmp NAPOT mode: 0x{:x}", pmpaddr);
+                // print!("napot\t");
                 let mut a = 1;
                 let mut pow: i32 = 0;
-                while !pmpaddr & a == 1 {
+                while pmpaddr & a > 0 {
                     a <<= 1;
                     pow += 1;
                 }
                 bot = (pmpaddr >> pow) << (pow + 2);
                 // println!("pmpaddr: 0x{:x}", pmpaddr);
                 // println!("pow: {}, bot: 0x{:x}, size: 0x{:x}", pow, bot, (1 << (pow + 3)));
-                top = bot + (1 << (pow + 3));
+                top = bot + (1 << (pow + 3)) ;
             }
             _ => {
                 top = 0;
@@ -69,6 +70,8 @@ pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
         };
         let bot = bot as u32;
         let top = top as u32;
+        // println!("{i} :0x{:x}", pmpaddr);
+        // println!("\t0x{:x} - 0x{:x}", bot, top);
         if addr >= bot && addr + len <= top {
             // full match
             if pmpcfg.lock {

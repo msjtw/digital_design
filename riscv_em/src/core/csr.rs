@@ -1,6 +1,12 @@
-use super::{exceptions::Exception, Core};
+use super::{Core, exceptions::Exception};
 
-static LEGAL_ADRESSES: [u32; 60] = [0xf11, 0xf12, 0xf13, 0xf14, 0x340, 0x140, 0xC00, 0xC80, 0xC01, 0xC81, 0xC02, 0xC82, 0xB00, 0xB80, 0xB02, 0xB82, 0x344, 0x144, 0x304, 0x104, 0x305, 0x105, 0x341, 0x141, 0x342, 0x142, 0x343, 0x143, 0x302, 0x312, 0x303, 0x300, 0x310, 0x100, 0x180, 0x301, 0x3A0, 0x3A1, 0x3A2, 0x3A3, 0x3B0, 0x3B1, 0x3B2, 0x3B3, 0x3B4, 0x3B5, 0x3B6, 0x3B7, 0x3B8, 0x3B9, 0x3BA, 0x3BB, 0x3BC, 0x3BD, 0x3BE, 0x3BF, 0x306, 0x106, 0x320, 0x120];
+static LEGAL_ADRESSES: [u32; 61] = [
+    0xf11, 0xf12, 0xf13, 0xf14, 0x340, 0x140, 0xC00, 0xC80, 0xC01, 0xC81, 0xC02, 0xC82, 0xB00,
+    0xB80, 0xB02, 0xB82, 0x344, 0x144, 0x304, 0x104, 0x305, 0x105, 0x341, 0x141, 0x342, 0x142,
+    0x343, 0x143, 0x302, 0x312, 0x303, 0x300, 0x310, 0x100, 0x180, 0x301, 0x3A0, 0x3A1, 0x3A2,
+    0x3A3, 0x3B0, 0x3B1, 0x3B2, 0x3B3, 0x3B4, 0x3B5, 0x3B6, 0x3B7, 0x3B8, 0x3B9, 0x3BA, 0x3BB,
+    0x3BC, 0x3BD, 0x3BE, 0x3BF, 0x306, 0x106, 0x30A, 0x31A, 0x320,
+];
 
 pub fn read(csr: Csr, core: &Core) -> u32 {
     let addr = csr_addr(csr);
@@ -15,28 +21,28 @@ pub fn write(csr: Csr, data: u32, core: &mut Core) {
 
 #[allow(non_snake_case)]
 pub fn read_pmpXcfg(n: u32, core: &Core) -> u8 {
-    let addr = match n/4 {
+    let addr = match n / 4 {
         0 => csr_addr(Csr::pmpcfg0),
         1 => csr_addr(Csr::pmpcfg1),
         2 => csr_addr(Csr::pmpcfg2),
         _ => csr_addr(Csr::pmpcfg3),
     };
     let csr = core.csr_file[addr];
-    let val = csr >> (n%4)*8;
+    let val = csr >> (n % 4) * 8;
     val as u8
 }
 
 #[allow(non_snake_case)]
 pub fn write_pmpXcfg(n: u32, data: u8, core: &mut Core) {
-    let addr = match n/4 {
+    let addr = match n / 4 {
         0 => csr_addr(Csr::pmpcfg0),
         1 => csr_addr(Csr::pmpcfg1),
         2 => csr_addr(Csr::pmpcfg2),
         _ => csr_addr(Csr::pmpcfg3),
     };
     let mut csr = core.csr_file[addr];
-    csr &= !(0b11111111 << (n%4)*8);
-    let data = u32::from(data) << (n%4)*8;
+    csr &= !(0b11111111 << (n % 4) * 8);
+    let data = u32::from(data) << (n % 4) * 8;
     core.csr_file[addr] = csr & data;
     mirror(core);
 }
@@ -48,26 +54,53 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
         println!("Error csr read: 0x{:x}; No permisions {:?}", addr, perm);
         return Err(Exception::Illegal_instruction);
     }
-    //mcounteren
-    if (addr == 0xC00 || addr == 0xC80) && (core.csr_file[csr_addr(Csr::mcounteren)] & 0b1) == 0 && core.mode < 3 {
-        return Err(Exception::Illegal_instruction);  //cycle
+    // mcounteren
+    if (addr == 0xC00 || addr == 0xC80)
+        && (core.csr_file[csr_addr(Csr::mcounteren)] & 0b1) == 0
+        && core.mode < 3
+    {
+        return Err(Exception::Illegal_instruction); //cycle
     }
-    if (addr == 0xC01 || addr == 0xC81) && (core.csr_file[csr_addr(Csr::mcounteren)] & 0b10) == 0 && core.mode < 3 {
-        return Err(Exception::Illegal_instruction);  //time
+    if (addr == 0xC01 || addr == 0xC81)
+        && (core.csr_file[csr_addr(Csr::mcounteren)] & 0b10) == 0
+        && core.mode < 3
+    {
+        return Err(Exception::Illegal_instruction); //time
     }
-    if (addr == 0xC02 || addr == 0xC82) && (core.csr_file[csr_addr(Csr::mcounteren)] & 0b100) == 0 && core.mode < 3 {
-        return Err(Exception::Illegal_instruction);  //instret
+    if (addr == 0xC02 || addr == 0xC82)
+        && (core.csr_file[csr_addr(Csr::mcounteren)] & 0b100) == 0
+        && core.mode < 3
+    {
+        return Err(Exception::Illegal_instruction); //instret
     }
 
     //scounteren
-    if (addr == 0xC00 || addr == 0xC80) && (core.csr_file[csr_addr(Csr::scounteren)] & core.csr_file[csr_addr(Csr::mcounteren)] & 0b1) == 0 && core.mode < 1 {
-        return Err(Exception::Illegal_instruction);  //cycle
+    if (addr == 0xC00 || addr == 0xC80)
+        && (core.csr_file[csr_addr(Csr::scounteren)]
+            & core.csr_file[csr_addr(Csr::mcounteren)]
+            & 0b1)
+            == 0
+        && core.mode < 1
+    {
+        return Err(Exception::Illegal_instruction); //cycle
     }
-    if (addr == 0xC01 || addr == 0xC81) && (core.csr_file[csr_addr(Csr::scounteren)] & core.csr_file[csr_addr(Csr::mcounteren)] & 0b10) == 0 && core.mode < 1 {
-        return Err(Exception::Illegal_instruction);  //time
+    if (addr == 0xC01 || addr == 0xC81)
+        && (core.csr_file[csr_addr(Csr::scounteren)]
+            & core.csr_file[csr_addr(Csr::mcounteren)]
+            & 0b10)
+            == 0
+        && core.mode < 1
+    {
+        return Err(Exception::Illegal_instruction); //time
     }
-    if (addr == 0xC02 || addr == 0xC82) && (core.csr_file[csr_addr(Csr::scounteren)] & core.csr_file[csr_addr(Csr::mcounteren)] & 0b100) == 0 && core.mode < 1 {
-        return Err(Exception::Illegal_instruction);  //instret
+    if (addr == 0xC02 || addr == 0xC82)
+        && (core.csr_file[csr_addr(Csr::scounteren)]
+            & core.csr_file[csr_addr(Csr::mcounteren)]
+            & 0b100)
+            == 0
+        && core.mode < 1
+    {
+        return Err(Exception::Illegal_instruction); //instret
     }
 
     for laddr in LEGAL_ADRESSES {
@@ -83,14 +116,18 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
     // println!("csr write: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
     let perm = permissions(addr);
     if perm.mode > core.mode || !perm.w {
-        println!("Error csr write: 0x{:x} 0x{:x}; No permisions: {:?}", addr, data, perm);
-        return Err(Exception::Illegal_instruction)
+        println!(
+            "Error csr write: 0x{:x} 0x{:x}; No permisions: {:?}",
+            addr, data, perm
+        );
+        return Err(Exception::Illegal_instruction);
     }
+
     for laddr in LEGAL_ADRESSES {
         if laddr == addr {
             core.csr_file[addr as usize] = data;
             mirror(core);
-            return Ok(())
+            return Ok(());
         }
     }
     println!("Error csr write: 0x{:x}; Illegal address", addr);
@@ -134,26 +171,31 @@ pub fn read_64(csr: Csr64, core: &Core) -> u64 {
 }
 
 pub fn write_64(csr: Csr64, data: u64, core: &mut Core) {
+    let mcountinhibit = core.csr_file[csr_addr(Csr::mcountinhibit)];
     match csr {
-        Csr64::time => {
-            core.csr_file[csr_addr(Csr::time)] = data as u32;
-            core.csr_file[csr_addr(Csr::timeh)] = (data >> 32) as u32;
-        }
         Csr64::cycle => {
             core.csr_file[csr_addr(Csr::cycle)] = data as u32;
             core.csr_file[csr_addr(Csr::cycleh)] = (data >> 32) as u32;
         }
-        Csr64::mcycle => {
-            core.csr_file[csr_addr(Csr::mcycle)] = data as u32;
-            core.csr_file[csr_addr(Csr::mcycleh)] = (data >> 32) as u32;
+        Csr64::time => {
+            core.csr_file[csr_addr(Csr::time)] = data as u32;
+            core.csr_file[csr_addr(Csr::timeh)] = (data >> 32) as u32;
         }
         Csr64::instret => {
             core.csr_file[csr_addr(Csr::instret)] = data as u32;
             core.csr_file[csr_addr(Csr::instreth)] = (data >> 32) as u32;
         }
+        Csr64::mcycle => {
+            if (mcountinhibit & 0b1) == 0 {
+                core.csr_file[csr_addr(Csr::mcycle)] = data as u32;
+                core.csr_file[csr_addr(Csr::mcycleh)] = (data >> 32) as u32;
+            }
+        }
         Csr64::minstret => {
-            core.csr_file[csr_addr(Csr::minstret)] = data as u32;
-            core.csr_file[csr_addr(Csr::minstreth)] = (data >> 32) as u32;
+            if (mcountinhibit & 0b100) == 0 {
+                core.csr_file[csr_addr(Csr::minstret)] = data as u32;
+                core.csr_file[csr_addr(Csr::minstreth)] = (data >> 32) as u32;
+            }
         }
         Csr64::medeleg => {
             core.csr_file[csr_addr(Csr::medeleg)] = data as u32;
@@ -235,6 +277,9 @@ pub enum Csr {
     marchid,
     mimpid,
 
+    menvcfg,
+    menvcfgh,
+
     mscratch,
     sscratch,
 
@@ -303,9 +348,7 @@ pub enum Csr {
     pmpaddr13,
     pmpaddr14,
     pmpaddr15,
-
 }
-
 
 pub fn csr_addr(csrname: Csr) -> usize {
     match csrname {
@@ -313,6 +356,9 @@ pub fn csr_addr(csrname: Csr) -> usize {
         Csr::marchid => 0xf12,
         Csr::mimpid => 0xf13,
         Csr::mhartid => 0xf14,
+
+        Csr::menvcfg => 0x30A,
+        Csr::menvcfgh => 0x31A,
 
         Csr::mscratch => 0x340,
         Csr::sscratch => 0x140,
@@ -329,7 +375,7 @@ pub fn csr_addr(csrname: Csr) -> usize {
         Csr::minstret => 0xB02,
         Csr::minstreth => 0xB82,
 
-        Csr::mcountinhibit => 0x321,
+        Csr::mcountinhibit => 0x320,
         Csr::scountinhibit => 0x120,
         Csr::mcounteren => 0x306,
         Csr::scounteren => 0x106,

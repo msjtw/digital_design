@@ -53,6 +53,7 @@ pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> 
     match sv32::translate(addr, core) {
         Ok((phys_addr, perm)) => {
             if perm.x {
+                // println!("0x{:x} -> 0x{:x}", addr, phys_addr);
                 return phys_fetch_word(phys_addr, core);
             }
             return Err(exceptions::Exception::Instruction_page_fault);
