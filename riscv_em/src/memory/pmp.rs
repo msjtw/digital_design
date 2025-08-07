@@ -61,7 +61,7 @@ pub fn pmp_check(addr: u32, len: u32, core: &Core) -> super::MemoryPermissions {
                 bot = (pmpaddr >> pow) << (pow + 2);
                 // println!("pmpaddr: 0x{:x}", pmpaddr);
                 // println!("pow: {}, bot: 0x{:x}, size: 0x{:x}", pow, bot, (1 << (pow + 3)));
-                top = bot + (1 << (pow + 3)) ;
+                top = bot + (1 << (pow + 3)) -1;
             }
             _ => {
                 top = 0;

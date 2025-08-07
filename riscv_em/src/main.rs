@@ -9,7 +9,7 @@ use std::time::SystemTime;
 use termion::raw::IntoRawMode;
 
 
-const RAM_SIZE: usize = 64 * 1024 * 1024;
+const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
 const DEBUG: bool = false;
 const PRINT_START: u64 = 0;
@@ -68,9 +68,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        if DEBUG && ctr > 1e6 as u64 {
-            break;
-        }
+        // if DEBUG && ctr > 1e6 as u64 {
+        //     break;
+        // }
     }
 
     Ok(())

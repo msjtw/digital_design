@@ -424,6 +424,11 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.pc += 4;
                 }
                 0b0 => {
+                    //sfence
+                    if instr.funct7 == 0b0001001 {
+                       core.pc += 4;
+                       return Ok(State::Ok)
+                    }
                     match instr.imm {
                         //ecall
                         0b0 => {

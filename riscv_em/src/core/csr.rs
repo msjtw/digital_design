@@ -48,7 +48,10 @@ pub fn write_pmpXcfg(n: u32, data: u8, core: &mut Core) {
 }
 
 pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
-    // println!("csr read: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
+    // println!("csr read:  {}[0x{:x}] = 0x{:x}", csr_name(addr), addr, core.csr_file[addr as usize]);
+    // if addr == csr_addr(Csr::satp) as u32 {
+    //     println!("satp read: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
+    // }
     let perm = permissions(addr);
     if perm.mode > core.mode {
         println!("Error csr read: 0x{:x}; No permisions {:?}", addr, perm);
@@ -113,7 +116,10 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
 }
 
 pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception> {
-    // println!("csr write: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
+    // println!("csr write: {}[0x{:x}] <- 0x{:x}", csr_name(addr), addr, data);
+    // if addr == csr_addr(Csr::satp) as u32 {
+    //     println!("satp write: 0x{:x} 0x{:x}", addr, data);
+    // }
     let perm = permissions(addr);
     if perm.mode > core.mode || !perm.w {
         println!(
@@ -348,6 +354,74 @@ pub enum Csr {
     pmpaddr13,
     pmpaddr14,
     pmpaddr15,
+}
+
+pub fn csr_name(addr: u32) -> String {
+    match addr {
+        0xf11 => "mvendorid".to_string(),
+        0xf12 => "marchid".to_string(),
+        0xf13 => "mimpid".to_string(),
+        0xf14 => "mhartid".to_string(),
+        0x30A => "menvcfg".to_string(),
+        0x31A => "menvcfgh".to_string(),
+        0x340 => "mscratch".to_string(),
+        0x140 => "sscratch".to_string(),
+        0xC00 => "cycle".to_string(),
+        0xC80 => "cycleh".to_string(),
+        0xC01 => "time".to_string(),
+        0xC81 => "timeh".to_string(),
+        0xC02 => "instret".to_string(),
+        0xC82 => "instreth".to_string(),
+        0xB00 => "mcycle".to_string(),
+        0xB80 => "mcycleh".to_string(),
+        0xB02 => "minstret".to_string(),
+        0xB82 => "minstreth".to_string(),
+        0x320 => "mcountinhibit".to_string(),
+        0x120 => "scountinhibit".to_string(),
+        0x306 => "mcounteren".to_string(),
+        0x106 => "scounteren".to_string(),
+        0x344 => "mip".to_string(),
+        0x144 => "sip".to_string(),
+        0x304 => "mie".to_string(),
+        0x104 => "sie".to_string(),
+        0x305 => "mtvec".to_string(),
+        0x105 => "stvec".to_string(),
+        0x341 => "mepc".to_string(),
+        0x141 => "sepc".to_string(),
+        0x342 => "mcause".to_string(),
+        0x142 => "scause".to_string(),
+        0x343 => "mtval".to_string(),
+        0x143 => "stval".to_string(),
+        0x302 => "medeleg".to_string(),
+        0x312 => "medelegh".to_string(),
+        0x303 => "mideleg".to_string(),
+        0x300 => "mstatus".to_string(),
+        0x310 => "mstatush".to_string(),
+        0x100 => "sstatus".to_string(),
+        0x180 => "satp".to_string(),
+        0x301 => "misa".to_string(),
+        0x3A0 => "pmpcfg0".to_string(),
+        0x3A1 => "pmpcfg1".to_string(),
+        0x3A2 => "pmpcfg2".to_string(),
+        0x3A3 => "pmpcfg3".to_string(),
+        0x3B0 => "pmpaddr0".to_string(),
+        0x3B1 => "pmpaddr1".to_string(),
+        0x3B2 => "pmpaddr2".to_string(),
+        0x3B3 => "pmpaddr3".to_string(),
+        0x3B4 => "pmpaddr4".to_string(),
+        0x3B5 => "pmpaddr5".to_string(),
+        0x3B6 => "pmpaddr6".to_string(),
+        0x3B7 => "pmpaddr7".to_string(),
+        0x3B8 => "pmpaddr8".to_string(),
+        0x3B9 => "pmpaddr9".to_string(),
+        0x3BA => "pmpaddr10".to_string(),
+        0x3BB => "pmpaddr11".to_string(),
+        0x3BC => "pmpaddr12".to_string(),
+        0x3BD => "pmpaddr13".to_string(),
+        0x3BE => "pmpaddr14".to_string(),
+        0x3BF => "pmpaddr15".to_string(),
+        _ => "unknown".to_string(),
+    }
 }
 
 pub fn csr_addr(csrname: Csr) -> usize {

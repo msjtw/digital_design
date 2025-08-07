@@ -1,0 +1,7 @@
+set args ~/Downloads/opensbi/build/platform/generic/firmware/fw_payload.bin 
+break riscv_em::main
+break sv32.rs:109
+run
+c
+ref
+

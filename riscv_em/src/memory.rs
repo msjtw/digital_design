@@ -19,7 +19,7 @@ impl Default for Memory {
     fn default() -> Self {
         Memory {
             base_addr: super::RAM_OFFSET,
-            data: vec![0; super::RAM_SIZE],
+            data: vec![0; super::RAM_SIZE as usize],
 
             stdin: async_stdin().bytes(),
             read_byte: 0,
@@ -53,7 +53,6 @@ pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> 
     match sv32::translate(addr, core) {
         Ok((phys_addr, perm)) => {
             if perm.x {
-                // println!("0x{:x} -> 0x{:x}", addr, phys_addr);
                 return phys_fetch_word(phys_addr, core);
             }
             return Err(exceptions::Exception::Instruction_page_fault);
@@ -184,6 +183,10 @@ pub fn phys_fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Except
 
     let memory = &core.memory;
 
+    if addr > super::RAM_OFFSET + super::RAM_SIZE {
+        // return Err(exceptions::Exception::Instruction_access_fault);
+        println!("max: 0x{:x} < 0x{:x}",super::RAM_OFFSET + super::RAM_SIZE, addr);
+    }
     let address = (addr - memory.base_addr) as usize;
     let d = memory.data[address] as u32;
     let c = memory.data[address + 1] as u32;
