@@ -29,6 +29,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "/home/msjtw/Documents/digital_design/riscv_em/sixtyfourmb.dtb",
     )?;
 
+    let tmp= memory::phys_fetch_word(0x80400098, &mut proc);
+    println!("0x80400098: 0x{:x}", tmp.unwrap());
+
     let mut ctr = 0;
     loop {
         // let curr_cycle =

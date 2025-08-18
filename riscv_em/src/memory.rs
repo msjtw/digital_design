@@ -42,6 +42,7 @@ pub fn read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
+            println!("mmu error 1 @0x{:08x}", addr);
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::Load_page_fault),
@@ -58,6 +59,7 @@ pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> 
             return Err(exceptions::Exception::Instruction_page_fault);
         }
         Err(x) => {
+            println!("mmu error 2");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::Instruction_page_fault),
@@ -74,6 +76,7 @@ pub fn read_hword(addr: u32, core: &Core) -> Result<u16, exceptions::Exception> 
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
+            println!("mmu error 3");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::Load_page_fault),
@@ -90,6 +93,7 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
+            println!("mmu error 4");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::Load_page_fault),
@@ -106,6 +110,7 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
+            println!("mmu error 5");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::StoreAMO_page_fault),
@@ -122,6 +127,7 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
+            println!("mmu error 6");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::StoreAMO_page_fault),
@@ -138,6 +144,7 @@ pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
+            println!("mmu error 7");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::StoreAMO_page_fault),

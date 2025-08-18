@@ -49,9 +49,9 @@ pub fn write_pmpXcfg(n: u32, data: u8, core: &mut Core) {
 
 pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
     // println!("csr read:  {}[0x{:x}] = 0x{:x}", csr_name(addr), addr, core.csr_file[addr as usize]);
-    // if addr == csr_addr(Csr::satp) as u32 {
-    //     println!("satp read: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
-    // }
+    if addr == csr_addr(Csr::satp) as u32 {
+        println!("satp read: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
+    }
     let perm = permissions(addr);
     if perm.mode > core.mode {
         println!("Error csr read: 0x{:x}; No permisions {:?}", addr, perm);
@@ -117,9 +117,9 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
 
 pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception> {
     // println!("csr write: {}[0x{:x}] <- 0x{:x}", csr_name(addr), addr, data);
-    // if addr == csr_addr(Csr::satp) as u32 {
-    //     println!("satp write: 0x{:x} 0x{:x}", addr, data);
-    // }
+    if addr == csr_addr(Csr::satp) as u32 {
+        println!("satp write: 0x{:x} 0x{:x}", addr, data);
+    }
     let perm = permissions(addr);
     if perm.mode > core.mode || !perm.w {
         println!(

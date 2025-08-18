@@ -136,7 +136,7 @@ impl<'a> Core<'a> {
                     Ok(fetch_result) => {
                         if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
                             // print_state(self);
-                            println!("0x{:x?}: 0x{:08x?}", self.pc, fetch_result);
+                            println!("{} 0x{:x?}: 0x{:08x?}",self.mode, self.pc, fetch_result);
                             // if self.mtime > 788381 - 5 {
                             //     print_state_gdb(self);
                             // }
@@ -164,13 +164,13 @@ impl<'a> Core<'a> {
                             }
                             Err(e) => {
                                 self.trap = exception_number(e);
-                                self.is_trap;
+                                self.is_trap = true;
                             }
                         };
                     }
                     Err(e) => {
                         self.trap = exception_number(e);
-                        self.is_trap;
+                        self.is_trap = true;
                     }
                 };
             }
@@ -179,7 +179,8 @@ impl<'a> Core<'a> {
         self.reg_file[0] = 0;
 
         if self.is_trap {
-            println!("it's a trap 0x{:x}; mode:{}; instr 0x{:08x}", self.trap, self.mode, instr_fetch);
+            println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            println!("(x14) = 0x{:x}", self.reg_file[14]);
             // println!("midelg {:b}", csr::read(Csr::mideleg, self));
             // println!("medelg {:b}", csr::read(Csr::medeleg, self));
             if (self.trap as i32) < 0 {
@@ -309,7 +310,24 @@ impl<'a> Core<'a> {
         // save pc
         csr::write(Csr::sepc, self.pc, self);
         // jump to handler
-        self.pc = csr::read(Csr::stvec, self);
+        let stvec = csr::read(Csr::stvec, self);
+        if stvec & 0b11 != 0 {
+            println!("stvec vectored mode")
+        }
+        match stvec & 0b11 {
+            0 => self.pc = stvec,
+            1 => {
+                if (self.trap as i32) < 0 {
+                    // interrupt
+                    self.pc = (stvec >> 2) << 2;
+                    self.pc += 4 * ((self.trap << 1) >> 1);
+                } else {
+                    // exception
+                    self.pc = (stvec >> 2) << 2;
+                }
+            }
+            _ => self.pc = 0,
+        }
 
         // enter supervisor mode
         self.mode = 1;
