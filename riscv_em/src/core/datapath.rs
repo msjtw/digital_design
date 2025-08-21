@@ -164,7 +164,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
         }
         0b0101111 => {
             let mut write = true;
-            let mut write_val = 0;
+            let write_val;
             let addr = core.reg_file[instr.rs1 as usize] as u32;
             let rs2 = core.reg_file[instr.rs2 as usize];
             let rd;
@@ -182,6 +182,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
                     core.lr_address = addr;
                     core.lr_valid = true;
                     write = false;
+                    write_val = 0;
                 }
                 // SC.W
                 0b00011 => {
@@ -189,8 +190,9 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
                         write_val = rs2;
                         core.reg_file[instr.rd as usize] = 0;
                     } else {
-                        write = false;
                         core.reg_file[instr.rd as usize] = 1;
+                        write = false;
+                        write_val = 0;
                     }
                     core.lr_valid = false;
                 }
@@ -233,7 +235,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
                 _ => return Err(Exception::Illegal_instruction),
             }
             if write {
-                memory::write_word(addr, write_val as u32, core);
+                memory::write_word(addr, write_val as u32, core)?;
             }
             core.pc += 4;
         }
@@ -315,35 +317,35 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 0x0 => {
                     match memory::read_byte(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i8),
-                        Err(x) => return Err(x),
+                        Err(e) => return Err(e),
                     };
                 }
                 // lh
                 0x1 => {
                     match memory::read_hword(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i16),
-                        Err(x) => return Err(x),
+                        Err(e) => return Err(e),
                     };
                 }
                 // lw
                 0x2 => {
                     match memory::read_word(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
-                        Err(x) => return Err(x),
+                        Err(e) => return Err(e),
                     };
                 }
                 // lbu zero-extended
                 0x4 => {
                     match memory::read_byte(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
-                        Err(x) => return Err(x),
+                        Err(e) => return Err(e),
                     };
                 }
                 // lhu
                 0x5 => {
                     match memory::read_hword(addr, core) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
-                        Err(x) => return Err(x),
+                        Err(e) => return Err(e),
                     };
                 }
                 _ => return Err(Exception::Illegal_instruction),
@@ -363,7 +365,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
             match instr.funct3 {
                 // csrrw
                 0b001 => {
-                    // print!("csrrw: ");
                     let mut csr = 0;
                     if instr.rd != 0 {
                         csr = csr::read_addr(csr_addr, core)?;
@@ -374,7 +375,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrs
                 0b010 => {
-                    // print!("csrrs: ");
                     let csr = csr::read_addr(csr_addr, core)?;
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
@@ -384,7 +384,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrc
                 0b011 => {
-                    // print!("csrrc: ");
                     let csr = csr::read_addr(csr_addr, core)?;
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
@@ -394,7 +393,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrwi
                 0b101 => {
-                    // print!("csrrwi: ");
                     let mut csr = 0;
                     if instr.rd != 0 {
                         csr = csr::read_addr(csr_addr, core)?;
@@ -405,7 +403,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrsi
                 0b110 => {
-                    // print!("csrrsi: ");
                     let csr = csr::read_addr(csr_addr, core)?;
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
@@ -415,7 +412,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 // csrrci
                 0b111 => {
-                    // print!("csrrci: ");
                     let csr = csr::read_addr(csr_addr, core)?;
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
@@ -433,16 +429,10 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                         //ecall
                         0b0 => {
                             if core.mode == 3 {
-                                // machine ecall
-                                // println!("ecall M");
                                 return Err(Exception::Environment_call_from_Mmode);
                             } else if core.mode == 1 {
-                                // supervisor ecall
-                                // println!("ecall S");
                                 return Err(Exception::Environment_call_from_Smode);
                             } else if core.mode == 0 {
-                                // user ecall
-                                // println!("ecall U");
                                 return Err(Exception::Environment_call_from_Umode);
                             }
                             // core.pc += 4;

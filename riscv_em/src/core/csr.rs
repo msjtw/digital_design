@@ -420,7 +420,7 @@ pub fn csr_name(addr: u32) -> String {
         0x3BD => "pmpaddr13".to_string(),
         0x3BE => "pmpaddr14".to_string(),
         0x3BF => "pmpaddr15".to_string(),
-        _ => "unknown".to_string(),
+        _ => "unimplemented csr".to_string(),
     }
 }
 

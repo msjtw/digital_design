@@ -96,7 +96,7 @@ impl Into<u32> for PA {
     }
 }
 
-pub fn translate( virt_a: u32, core: &Core,) -> Result<(u32, MemoryPermissions), Option<exceptions::Exception>> {
+pub fn translate( virt_a: u32, core: &mut Core,) -> Result<(u32, MemoryPermissions), Option<exceptions::Exception>> {
     let satp = csr::read(csr::Csr::satp, core);
     let satp = SATP::from(satp);
 
@@ -108,6 +108,7 @@ pub fn translate( virt_a: u32, core: &Core,) -> Result<(u32, MemoryPermissions),
         ));
     }
 
+    core.prt = true;
     let va = VA::from(virt_a);
 
     let mut a = satp.ppn * PAGESIZE;
@@ -197,6 +198,10 @@ pub fn translate( virt_a: u32, core: &Core,) -> Result<(u32, MemoryPermissions),
         return Err(None);
     }
 
+    if i > 0 {
+        print!("superpage  ");
+    }
+
     let mstatus = csr::read(csr::Csr::mstatus, core);
     let mstatus_sum = mstatus & 1 << 18;
     let mstatus_mxr = mstatus & 1 << 19;
@@ -221,7 +226,7 @@ pub fn translate( virt_a: u32, core: &Core,) -> Result<(u32, MemoryPermissions),
     };
 
     let phys_a: u32 = pa.into();
-    // println!("0x{:x} -> 0x{:x}", virt_a, phys_a);
+    println!("0x{:x} -> 0x{:x}", virt_a, phys_a);
 
     if mstatus_mxr > 0{
         // make eXecutable Readable

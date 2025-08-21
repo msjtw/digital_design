@@ -34,6 +34,10 @@ pub struct Core<'a> {
     lr_valid: bool,
     pub mode: u32,
     wfi: bool, // wait for interrupt
+    
+    last_x14: i32,
+    last_x4: i32,
+    pub prt: bool,
 }
 
 impl<'a> Core<'a> {
@@ -54,6 +58,10 @@ impl<'a> Core<'a> {
             lr_valid: false,
             mode: 0,
             wfi: false,
+
+            last_x14: 0,
+            last_x4: 0,
+            prt: false,
         }
     }
 
@@ -203,6 +211,25 @@ impl<'a> Core<'a> {
         } else {
             let minstret = csr::read_64(Csr64::minstret, self);
             csr::write_64(Csr64::minstret, minstret + 1, self);
+        }
+
+        if self.prt{
+            print!("instr: 0x{:08x}", instr_fetch);
+        }
+        let mut prt = false;
+        if self.reg_file[14] != self.last_x14 {
+            println!("x14 changed: 0x{:08x}; *0x{:08x} = 0x{:08x}, x4=0x{:08x}", self.reg_file[14], self.pc, instr_fetch, self.reg_file[4]);
+            self.last_x14 = self.reg_file[14];
+            prt = true;
+        }
+
+        if self.reg_file[4] != self.last_x4 {
+            println!("x4 changed: 0x{:08x}, *0x{:08x} = 0x{:08x}", self.reg_file[4], self.pc, instr_fetch);
+            self.last_x4 = self.reg_file[4];
+            prt = true;
+        }
+        if !prt && self.prt {
+            println!();
         }
 
         Ok(State::Ok)

@@ -33,7 +33,7 @@ pub struct MemoryPermissions {
     x: bool,
 }
 
-pub fn read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
+pub fn read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
     match sv32::translate(addr, core) {
         Ok((phys_addr, perm)) => {
             if perm.r {
@@ -50,7 +50,7 @@ pub fn read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
         }
     };
 }
-pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
+pub fn fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
     match sv32::translate(addr, core) {
         Ok((phys_addr, perm)) => {
             if perm.x {
@@ -67,7 +67,7 @@ pub fn fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> 
         }
     };
 }
-pub fn read_hword(addr: u32, core: &Core) -> Result<u16, exceptions::Exception> {
+pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Exception> {
     match sv32::translate(addr, core) {
         Ok((phys_addr, perm)) => {
             if perm.r {
