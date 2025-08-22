@@ -3,9 +3,12 @@ mod datapath;
 pub mod exceptions;
 mod instr_parse;
 
+mod instr_debug;
+
 use crate::memory::{self};
 use csr::{Csr, Csr64};
 use exceptions::*;
+use instr_debug::debug_instr;
 use instr_parse::Instruction;
 use std::{fs, u32};
 
@@ -34,10 +37,8 @@ pub struct Core<'a> {
     lr_valid: bool,
     pub mode: u32,
     wfi: bool, // wait for interrupt
-    
-    last_x14: i32,
-    last_x4: i32,
-    pub prt: bool,
+
+    pub instr_str: String,
 }
 
 impl<'a> Core<'a> {
@@ -59,9 +60,7 @@ impl<'a> Core<'a> {
             mode: 0,
             wfi: false,
 
-            last_x14: 0,
-            last_x4: 0,
-            prt: false,
+            instr_str: String::new(),
         }
     }
 
@@ -150,6 +149,7 @@ impl<'a> Core<'a> {
                             // }
                         }
                         instr_fetch = fetch_result;
+                        self.instr_str = debug_instr(self, instr_fetch);
                         
                         match Instruction::from(fetch_result) {
                             Ok(instr) => {
@@ -188,6 +188,7 @@ impl<'a> Core<'a> {
 
         if self.is_trap {
             println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            println!("{}", debug_instr(self, instr_fetch));
             println!("(x14) = 0x{:x}", self.reg_file[14]);
             // println!("midelg {:b}", csr::read(Csr::mideleg, self));
             // println!("medelg {:b}", csr::read(Csr::medeleg, self));
@@ -213,24 +214,24 @@ impl<'a> Core<'a> {
             csr::write_64(Csr64::minstret, minstret + 1, self);
         }
 
-        if self.prt{
-            print!("instr: 0x{:08x}", instr_fetch);
-        }
-        let mut prt = false;
-        if self.reg_file[14] != self.last_x14 {
-            println!("x14 changed: 0x{:08x}; *0x{:08x} = 0x{:08x}, x4=0x{:08x}", self.reg_file[14], self.pc, instr_fetch, self.reg_file[4]);
-            self.last_x14 = self.reg_file[14];
-            prt = true;
-        }
-
-        if self.reg_file[4] != self.last_x4 {
-            println!("x4 changed: 0x{:08x}, *0x{:08x} = 0x{:08x}", self.reg_file[4], self.pc, instr_fetch);
-            self.last_x4 = self.reg_file[4];
-            prt = true;
-        }
-        if !prt && self.prt {
-            println!();
-        }
+        // if self.prt{
+        //     print!("{}", debug_instr(&self, instr_fetch));
+        // }
+        // let mut prt = false;
+        // if self.reg_file[14] != self.last_x14 {
+        //     println!("x14 changed: 0x{:08x}; *0x{:08x} = 0x{:08x}, x4=0x{:08x}", self.reg_file[14], self.pc, instr_fetch, self.reg_file[4]);
+        //     self.last_x14 = self.reg_file[14];
+        //     prt = true;
+        // }
+        //
+        // if self.reg_file[4] != self.last_x4 {
+        //     println!("x4 changed: 0x{:08x}, *0x{:08x} = 0x{:08x}", self.reg_file[4], self.pc, instr_fetch);
+        //     self.last_x4 = self.reg_file[4];
+        //     prt = true;
+        // }
+        // if !prt && self.prt {
+        //     println!();
+        // }
 
         Ok(State::Ok)
     }

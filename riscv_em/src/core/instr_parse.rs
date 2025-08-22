@@ -258,7 +258,7 @@ impl Instruction {
             _ => {
                 println!("opcode: 0b{opcode:b}");
                 println!("0x{byte_code:x}");
-                process::exit(1);
+                // process::exit(1);
                 Err(exceptions::Exception::Illegal_instruction)
             }
         }

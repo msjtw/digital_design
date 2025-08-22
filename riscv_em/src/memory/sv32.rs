@@ -108,15 +108,15 @@ pub fn translate( virt_a: u32, core: &mut Core,) -> Result<(u32, MemoryPermissio
         ));
     }
 
-    core.prt = true;
     let va = VA::from(virt_a);
 
     let mut a = satp.ppn * PAGESIZE;
     let mut i = LEVELS - 1;
 
-    if MMU_DEBUG {
+    if virt_a == 0xc1405528 {
         println!("--------");
-        println!("mode: {}, pc: {}", core.mode, core.pc);
+        println!("mode: {}, pc: 0x{:08x}", core.mode, core.pc);
+        println!("{}", core.instr_str);
         println!("satp 0b{:b}", csr::read(csr::Csr::satp, core));
         println!("satp {:?}", satp);
         println!("a:   0x{:x}", a);
@@ -130,14 +130,14 @@ pub fn translate( virt_a: u32, core: &mut Core,) -> Result<(u32, MemoryPermissio
     let index = va.vpn1 * PTESIZE;
     let pte_m1 = phys_read_word(a + index, core)?;
 
-    if MMU_DEBUG {
-        println!("0x{:x}", a + index);
+    if virt_a == 0xc1405528 {
+        println!("pte addr: 0x{:x}", a + index);
         println!("pte_1: 0b{:b}", pte_m1);
     }
 
     let mut pte = PTE::from(pte_m1);
 
-    if MMU_DEBUG {
+    if virt_a == 0xc1405528 {
         println!("{:?}", pte);
     }
 
@@ -152,7 +152,7 @@ pub fn translate( virt_a: u32, core: &mut Core,) -> Result<(u32, MemoryPermissio
 
     if !pte.v || (!pte.r && pte.w) {
         // page fault
-        println!("--------");
+        println!("*-------");
         println!("mode: {}, pc: 0x{:08x}", core.mode, core.pc);
         println!("satp 0b{:b}", csr::read(csr::Csr::satp, core));
         println!("satp {:?}", satp);
@@ -163,7 +163,7 @@ pub fn translate( virt_a: u32, core: &mut Core,) -> Result<(u32, MemoryPermissio
         println!("va {:?}", va);
         println!("page fault 1");
         println!("pte *0x{:08x} {:?}", a+index,  pte);
-        println!("--------");
+        println!("+-------");
         return Err(None);
     }
 
@@ -174,8 +174,11 @@ pub fn translate( virt_a: u32, core: &mut Core,) -> Result<(u32, MemoryPermissio
         let index = va.vpn0 * PTESIZE;
         let pte_m0 = phys_read_word(a + index, core)?;
         pte = PTE::from(pte_m0);
-        // println!("\tpte_0: 0b{:b}", pte_m1);
-        // println!("\t{:?}", pte);
+        if virt_a == 0xc1405528 {
+            println!("\tpte addr: 0x{:x}", a + index);
+            println!("\tpte_0: 0b{:b}", pte_m0);
+            println!("\t{:?}", pte);
+        }
         if !pte.v || (!pte.r && pte.w) {
             // page fault
             println!("page fault 2");
@@ -198,9 +201,9 @@ pub fn translate( virt_a: u32, core: &mut Core,) -> Result<(u32, MemoryPermissio
         return Err(None);
     }
 
-    if i > 0 {
-        print!("superpage  ");
-    }
+    // if i > 0 {
+    //     print!("superpage  ");
+    // }
 
     let mstatus = csr::read(csr::Csr::mstatus, core);
     let mstatus_sum = mstatus & 1 << 18;
@@ -226,8 +229,11 @@ pub fn translate( virt_a: u32, core: &mut Core,) -> Result<(u32, MemoryPermissio
     };
 
     let phys_a: u32 = pa.into();
-    println!("0x{:x} -> 0x{:x}", virt_a, phys_a);
 
+    if virt_a == 0xc1405528 {
+        println!("0x{:x} -> 0x{:x}", virt_a, phys_a);
+        println!("mem[0x{:08x}] = 0x{:08x}", phys_a, phys_read_word(phys_a, core).unwrap_or(0));
+    }
     if mstatus_mxr > 0{
         // make eXecutable Readable
         return Ok((phys_a ,MemoryPermissions {r: pte.x, w: pte.w, x: pte.x}));
