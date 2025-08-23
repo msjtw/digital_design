@@ -1,7 +1,5 @@
 set architecture riscv:rv32
 set disassemble-next-line on
 target remote :1234
-hbreak *0x8055ea38
-hbreak *0xc015ea38
-break *$pc if $pc == 0xc015ea38
-
+break *0x80400090
+break *0x81805528

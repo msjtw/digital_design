@@ -1,3 +1,6 @@
+
+// There are waaaaay to many errors in this code.
+
 use std::fmt::format;
 
 use crate::core::Core;
@@ -407,19 +410,19 @@ fn debug_i(core: &Core, instr: &IType) -> String {
             let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
             match instr.funct3 {
                 // lb sign-extended
-                0x0 => format!("lb\t(0x{}) mem[0x{:x}]", instr.rd, addr),
+                0x0 => format!("lb\t(0x{}) = mem[(x{} + {:x})0x{:x}]", instr.rd, instr.rs1, instr.imm, addr),
 
                 // lh
-                0x1 => format!("lh\t(0x{}) mem[0x{:x}]", instr.rd, addr),
+                0x1 => format!("lh\t(0x{}) = mem[(x{} + {:x})0x{:x}]", instr.rd, instr.rs1, instr.imm, addr),
 
                 // lw
-                0x2 => format!("lw\t(0x{}) mem[0x{:x}]", instr.rd, addr),
+                0x2 => format!("lw\t(0x{}) = mem[(x{} + {:x})0x{:x}]", instr.rd, instr.rs1, instr.imm, addr),
 
                 // lbu zero-extended
-                0x4 => format!("lbu\t(0x{}) mem[0x{:x}]", instr.rd, addr),
+                0x4 => format!("lbu\t(0x{}) = mem[(x{} + {:x})0x{:x}]", instr.rd, instr.rs1, instr.imm, addr),
 
                 // lhu
-                0x5 => format!("lhu\t(0x{}) mem[0x{:x}]", instr.rd, addr),
+                0x5 => format!("lhu\t(0x{}) = mem[(x{} + {:x})0x{:x}]", instr.rd, instr.rs1, instr.imm, addr),
 
                 _ => format!("unknown I type instruction {:?}", instr),
             }
@@ -544,11 +547,11 @@ fn debug_s(core: &Core, instr: &SType) -> String {
     let rs2 = core.reg_file[instr.rs2 as usize];
     match instr.funct3 {
         //sb
-        0x0 => format!("sw\t [0x{:08x}] = 0x{:x}", addr, rs2 as u8),
+        0x0 => format!("sw\t mem[(x{}+{:x})0x{:08x}] = (x{})0x{:x}", instr.rs1, instr.imm, addr, instr.rs2, rs2 as u8),
         //sh
-        0x1 => format!("sw\t [0x{:08x}] = 0x{:x}", addr, rs2 as u16),
+        0x1 => format!("sw\t mem[(x{}+{:x})0x{:08x}] = (x{})0x{:x}", instr.rs1, instr.imm, addr, instr.rs2, rs2 as u16),
         //sw
-        0x2 => format!("sw\t [0x{:08x}] = 0x{:x}", addr, rs2 as u32),
+        0x2 => format!("sw\t mem[(x{}+{:x})0x{:08x}] = (x{})0x{:x}", instr.rs1, instr.imm, addr, instr.rs2, rs2 as u32),
         _ => format!("unknown S type instruction {:?}", instr),
     }
 }

@@ -5,6 +5,7 @@ use crate::core::{Core, exceptions};
 use std::io::Write;
 use std::io::{Bytes, Read};
 use termion::async_stdin;
+use sv32::AccessType;
 
 // #[derive(Debug)]
 pub struct Memory {
@@ -34,7 +35,7 @@ pub struct MemoryPermissions {
 }
 
 pub fn read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
-    match sv32::translate(addr, core) {
+    match sv32::translate(addr, core, AccessType::R) {
         Ok((phys_addr, perm)) => {
             if perm.r {
                 return phys_read_word(phys_addr, core);
@@ -51,7 +52,7 @@ pub fn read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exceptio
     };
 }
 pub fn fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
-    match sv32::translate(addr, core) {
+    match sv32::translate(addr, core, AccessType::X) {
         Ok((phys_addr, perm)) => {
             if perm.x {
                 return phys_fetch_word(phys_addr, core);
@@ -68,7 +69,7 @@ pub fn fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Excepti
     };
 }
 pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Exception> {
-    match sv32::translate(addr, core) {
+    match sv32::translate(addr, core, AccessType::R) {
         Ok((phys_addr, perm)) => {
             if perm.r {
                 return phys_read_hword(phys_addr, core);
@@ -85,7 +86,7 @@ pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Excepti
     };
 }
 pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception> {
-    match sv32::translate(addr, core) {
+    match sv32::translate(addr, core, AccessType::R) {
         Ok((phys_addr, perm)) => {
             if perm.r {
                 return phys_read_byte(phys_addr, core);
@@ -102,7 +103,7 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
     };
 }
 pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
-    match sv32::translate(addr, core) {
+    match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
                 return phys_write_word(phys_addr, data, core);
@@ -119,7 +120,7 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
     };
 }
 pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptions::Exception> {
-    match sv32::translate(addr, core) {
+    match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
                 return phys_write_hword(phys_addr, data, core);
@@ -136,7 +137,7 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
     };
 }
 pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions::Exception> {
-    match sv32::translate(addr, core) {
+    match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
                 return phys_write_byte(phys_addr, data, core);

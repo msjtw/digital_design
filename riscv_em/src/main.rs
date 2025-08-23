@@ -11,8 +11,8 @@ use termion::raw::IntoRawMode;
 
 const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = false;
-const PRINT_START: u64 = 0;
+const DEBUG: bool = true;
+const PRINT_START: u64 = 1e7 as u64;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         ctr += 1;
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros() as u64;
-        proc.mtime = ctr;
+        proc.mtime = now;
 
         match proc.exec() {
             Ok(x) => match x {

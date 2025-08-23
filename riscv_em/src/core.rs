@@ -39,6 +39,7 @@ pub struct Core<'a> {
     wfi: bool, // wait for interrupt
 
     pub instr_str: String,
+    pub p_start: bool,
 }
 
 impl<'a> Core<'a> {
@@ -61,6 +62,7 @@ impl<'a> Core<'a> {
             wfi: false,
 
             instr_str: String::new(),
+            p_start: false,
         }
     }
 
@@ -103,9 +105,9 @@ impl<'a> Core<'a> {
     }
 
     pub fn exec(&mut self) -> Result<State, Exception> {
-        // if super::DEBUG {
-        //     print!("|");
-        // }
+        if super::DEBUG && self.pc == 0xc0413074 {
+            self.p_start = true;
+        }
 
         let mut mip = csr::read(Csr::mip, self);
         if self.mtime > self.mtimecmp {
@@ -141,15 +143,16 @@ impl<'a> Core<'a> {
 
                 match memory::fetch_word(self.pc, self) {
                     Ok(fetch_result) => {
-                        if super::DEBUG && csr::read_64(Csr64::mcycle, self) > super::PRINT_START {
+                        if super::DEBUG && (csr::read_64(Csr64::mcycle, self) > super::PRINT_START || self.p_start) {
                             // print_state(self);
-                            println!("{} 0x{:x?}: 0x{:08x?}",self.mode, self.pc, fetch_result);
+                            print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
+                            // println!("{}", debug_instr(self, fetch_result));
                             // if self.mtime > 788381 - 5 {
                             //     print_state_gdb(self);
                             // }
                         }
                         instr_fetch = fetch_result;
-                        self.instr_str = debug_instr(self, instr_fetch);
+                        // self.instr_str = debug_instr(self, instr_fetch);
                         
                         match Instruction::from(fetch_result) {
                             Ok(instr) => {
@@ -187,9 +190,9 @@ impl<'a> Core<'a> {
         self.reg_file[0] = 0;
 
         if self.is_trap {
-            println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
-            println!("{}", debug_instr(self, instr_fetch));
-            println!("(x14) = 0x{:x}", self.reg_file[14]);
+            // println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            // println!("{}", debug_instr(self, instr_fetch));
+            // println!("(x14) = 0x{:x}", self.reg_file[14]);
             // println!("midelg {:b}", csr::read(Csr::mideleg, self));
             // println!("medelg {:b}", csr::read(Csr::medeleg, self));
             if (self.trap as i32) < 0 {
