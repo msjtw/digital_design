@@ -12,7 +12,7 @@ use termion::raw::IntoRawMode;
 const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
 const DEBUG: bool = true;
-const PRINT_START: u64 = 1e7 as u64;
+const PRINT_START: u64 = 0 as u64;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -28,9 +28,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         &args[1], //kernel Image
         "/home/msjtw/Documents/digital_design/riscv_em/sixtyfourmb.dtb",
     )?;
-
-    let tmp= memory::phys_fetch_word(0x80400098, &mut proc);
-    println!("0x80400098: 0x{:x}", tmp.unwrap());
 
     let mut ctr = 0;
     loop {

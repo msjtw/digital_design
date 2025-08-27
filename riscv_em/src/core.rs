@@ -32,13 +32,13 @@ pub struct Core<'a> {
 
     trap: u32,
     trap_val: u32,
-    is_trap: bool,
     lr_address: u32,
     lr_valid: bool,
     pub mode: u32,
     wfi: bool, // wait for interrupt
 
     pub instr_str: String,
+    pub last_pa: u32,
     pub p_start: bool,
 }
 
@@ -53,15 +53,16 @@ impl<'a> Core<'a> {
             mtime: 0,
             mtimecmp: 0,
 
-            trap: 0,
+            // there is no trap with this number
+            trap: u32::MAX,
             trap_val: 0,
-            is_trap: false,
             lr_address: 0,
             lr_valid: false,
             mode: 0,
             wfi: false,
 
             instr_str: String::new(),
+            last_pa: 0,
             p_start: false,
         }
     }
@@ -83,6 +84,7 @@ impl<'a> Core<'a> {
         let mut dtb_addr = super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32;
         dtb_addr >>= 3;
         dtb_addr <<= 3;
+        dtb_addr = 0x83e00000u32;
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
             let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
@@ -100,13 +102,13 @@ impl<'a> Core<'a> {
         //                            Spent a whole week looking for a problem,
         //                            ... I missed q in alphabet.
         csr::write(Csr::menvcfgh, 0b00010000000000000000000000000000, self);
-        csr::write(Csr::menvcfg,  0b00000000000000000000000000000000, self);
+        csr::write(Csr::menvcfg, 0b00000000000000000000000000000000, self);
         Ok(())
     }
 
     pub fn exec(&mut self) -> Result<State, Exception> {
-        if super::DEBUG && self.pc == 0xc0413074 {
-            self.p_start = true;
+        if super::DEBUG && self.pc == 0xc02eb9c8 {
+            // self.p_start = true;
         }
 
         let mut mip = csr::read(Csr::mip, self);
@@ -131,29 +133,30 @@ impl<'a> Core<'a> {
         if (mstatus & 1 << 3) != 0 && (mie & 1 << 7) != 0 && (mip & 1 << 7) != 0 {
             // machine timer interrupt
             self.trap = 0x80000007;
-            self.is_trap = true;
         } else {
             if self.pc & 0b11 > 0 {
                 // check instruction address aligment
                 self.trap = 0;
-                self.is_trap = true;
             } else {
                 let cycle = csr::read_64(Csr64::mcycle, self);
                 csr::write_64(Csr64::mcycle, cycle + 1, self);
 
                 match memory::fetch_word(self.pc, self) {
                     Ok(fetch_result) => {
-                        if super::DEBUG && (csr::read_64(Csr64::mcycle, self) > super::PRINT_START || self.p_start) {
+                        if super::DEBUG
+                            && (csr::read_64(Csr64::mcycle, self) > super::PRINT_START
+                                || self.p_start)
+                        {
                             // print_state(self);
                             print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
                             // println!("{}", debug_instr(self, fetch_result));
                             // if self.mtime > 788381 - 5 {
-                            //     print_state_gdb(self);
+                            print_state_gdb(self);
                             // }
                         }
                         instr_fetch = fetch_result;
                         // self.instr_str = debug_instr(self, instr_fetch);
-                        
+
                         match Instruction::from(fetch_result) {
                             Ok(instr) => {
                                 let ret = match instr {
@@ -167,34 +170,21 @@ impl<'a> Core<'a> {
                                 match ret {
                                     Ok(State::Ok) => {}
                                     Ok(x) => return Ok(x),
-                                    Err(e) => {
-                                        self.trap = exception_number(e);
-                                        self.is_trap = true;
-                                    }
+                                    Err(e) => self.trap = exception_number(e),
                                 };
                             }
-                            Err(e) => {
-                                self.trap = exception_number(e);
-                                self.is_trap = true;
-                            }
+                            Err(e) => self.trap = exception_number(e),
                         };
                     }
-                    Err(e) => {
-                        self.trap = exception_number(e);
-                        self.is_trap = true;
-                    }
+                    Err(e) => self.trap = exception_number(e),
                 };
             }
         }
 
         self.reg_file[0] = 0;
 
-        if self.is_trap {
+        if self.trap != u32::MAX {
             // println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
-            // println!("{}", debug_instr(self, instr_fetch));
-            // println!("(x14) = 0x{:x}", self.reg_file[14]);
-            // println!("midelg {:b}", csr::read(Csr::mideleg, self));
-            // println!("medelg {:b}", csr::read(Csr::medeleg, self));
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
@@ -216,25 +206,6 @@ impl<'a> Core<'a> {
             let minstret = csr::read_64(Csr64::minstret, self);
             csr::write_64(Csr64::minstret, minstret + 1, self);
         }
-
-        // if self.prt{
-        //     print!("{}", debug_instr(&self, instr_fetch));
-        // }
-        // let mut prt = false;
-        // if self.reg_file[14] != self.last_x14 {
-        //     println!("x14 changed: 0x{:08x}; *0x{:08x} = 0x{:08x}, x4=0x{:08x}", self.reg_file[14], self.pc, instr_fetch, self.reg_file[4]);
-        //     self.last_x14 = self.reg_file[14];
-        //     prt = true;
-        // }
-        //
-        // if self.reg_file[4] != self.last_x4 {
-        //     println!("x4 changed: 0x{:08x}, *0x{:08x} = 0x{:08x}", self.reg_file[4], self.pc, instr_fetch);
-        //     self.last_x4 = self.reg_file[4];
-        //     prt = true;
-        // }
-        // if !prt && self.prt {
-        //     println!();
-        // }
 
         Ok(State::Ok)
     }
@@ -278,9 +249,9 @@ impl<'a> Core<'a> {
         csr::write(Csr::mepc, self.pc, self);
         // jump to handler
         let mtvec = csr::read(Csr::mtvec, self);
-        if mtvec & 0b11 != 0 {
-            println!("mtvec vectored mode")
-        }
+        // if mtvec & 0b11 != 0 {
+        //     println!("mtvec vectored mode")
+        // }
         match mtvec & 0b11 {
             0 => self.pc = mtvec,
             1 => {
@@ -299,8 +270,7 @@ impl<'a> Core<'a> {
         // enter machine mode
         self.mode = 3;
         // clear trap
-        self.trap = 0;
-        self.is_trap = false;
+        self.trap = u32::MAX;
     }
 
     fn s_mode_trap_handler(&mut self) {
@@ -342,9 +312,9 @@ impl<'a> Core<'a> {
         csr::write(Csr::sepc, self.pc, self);
         // jump to handler
         let stvec = csr::read(Csr::stvec, self);
-        if stvec & 0b11 != 0 {
-            println!("stvec vectored mode")
-        }
+        // if stvec & 0b11 != 0 {
+        //     println!("stvec vectored mode")
+        // }
         match stvec & 0b11 {
             0 => self.pc = stvec,
             1 => {
@@ -363,8 +333,7 @@ impl<'a> Core<'a> {
         // enter supervisor mode
         self.mode = 1;
         // clear trap
-        self.trap = 0;
-        self.is_trap = false;
+        self.trap = u32::MAX;
     }
 }
 pub fn print_state(core: &Core) {

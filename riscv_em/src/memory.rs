@@ -103,6 +103,9 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
     };
 }
 pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
+    if addr == 0x9de00006 {
+        println!("write to 0x9de00006: 0x{:x}", data);
+    }
     match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
@@ -120,6 +123,9 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
     };
 }
 pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptions::Exception> {
+    if addr == 0x9de00006 {
+        println!("write to 0x9de00006: 0x{:x}", data);
+    }
     match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
@@ -137,6 +143,9 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
     };
 }
 pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions::Exception> {
+    if addr == 0x9de00006 {
+        println!("write to 0x9de00006: 0x{:x}", data);
+    }
     match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {

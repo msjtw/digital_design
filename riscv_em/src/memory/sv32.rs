@@ -33,34 +33,36 @@ struct PTE {
 impl From<u32> for PTE {
     fn from(pte: u32) -> Self {
         PTE {
-            ppn: (pte & 0b11111111111111111111110000000000) >> 10,
+            ppn:  (pte & 0b11111111111111111111110000000000) >> 10,
             ppn1: (pte & 0b11111111111100000000000000000000) >> 20,
             ppn0: (pte & 0b00000000000011111111110000000000) >> 10,
             rsw: ((pte & 0b00000000000000000000001100000000) >> 8) as u8,
-            d: (pte & 0b00000000000000000000000010000000) >= 1,
-            a: (pte & 0b00000000000000000000000001000000) >= 1,
-            g: (pte & 0b00000000000000000000000000100000) >= 1,
-            u: (pte & 0b00000000000000000000000000010000) >= 1,
-            x: (pte & 0b00000000000000000000000000001000) >= 1,
-            w: (pte & 0b00000000000000000000000000000100) >= 1,
-            r: (pte & 0b00000000000000000000000000000010) >= 1,
-            v: (pte & 0b00000000000000000000000000000001) >= 1,
+            d:    (pte & 0b00000000000000000000000010000000) >= 1,
+            a:    (pte & 0b00000000000000000000000001000000) >= 1,
+            g:    (pte & 0b00000000000000000000000000100000) >= 1,
+            u:    (pte & 0b00000000000000000000000000010000) >= 1,
+            x:    (pte & 0b00000000000000000000000000001000) >= 1,
+            w:    (pte & 0b00000000000000000000000000000100) >= 1,
+            r:    (pte & 0b00000000000000000000000000000010) >= 1,
+            v:    (pte & 0b00000000000000000000000000000001) >= 1,
         }
     }
 }
 
 impl Into<u32> for PTE {
     fn into(self) -> u32 {
-        self.ppn << 10 + 
-        (self.rsw as u32) << 8 +
-        (self.d as u32) << 7 +
-        (self.a as u32) << 6 +
-        (self.g as u32) << 5 +
-        (self.u as u32) << 4 +
-        (self.x as u32) << 3 +
-        (self.w as u32) << 2 +
-        (self.r as u32) << 1 +
-        (self.v as u32) 
+        let res = 
+        (self.ppn as u32) << 10 | 
+        (self.rsw as u32) << 8 |
+        (self.d as u32) << 7 |
+        (self.a as u32) << 6 |
+        (self.g as u32) << 5 |
+        (self.u as u32) << 4 |
+        (self.x as u32) << 3 |
+        (self.w as u32) << 2 |
+        (self.r as u32) << 1 |
+        (self.v as u32);
+        res
     }
 }
 
@@ -300,42 +302,51 @@ pub fn translate(
 
     let phys_a: u32 = pa.into();
 
-    if virt_a == 0xc1405528 || virt_a == 0xc015ea2c {
-        println!("0x{:x} -> 0x{:x}", virt_a, phys_a);
-        println!(
-            "mem[0x{:08x}] = 0x{:08x}",
-            phys_a,
-            phys_read_word(phys_a, core).unwrap_or(0)
-        );
-    }
-
-    // println!("{:?}", pte);
-    // let mut pte = pte.set_a();
-    // match a_type {
-    //     AccessType::W => pte = pte.set_d(),
-    //     _ => {},
+    // if virt_a == 0xc1405528 || virt_a == 0xc015ea2c {
+    //     println!("pc: 0x{:08x}: 0x{:x} -> 0x{:x}", core.pc, virt_a, phys_a);
+    //     println!(
+    //         "mem[0x{:08x}] = 0x{:08x}",
+    //         phys_a,
+    //         phys_read_word(phys_a, core).unwrap_or(0)
+    //     );
     // }
-    // println!("{:?}", pte);
-    
-    // phys_write_word(pte_addr, pte.into(), core)?;
 
+
+
+
+    let res: (u32, MemoryPermissions);
     if mstatus_mxr > 0 {
         // make eXecutable Readable
-        return Ok((
+        res = (
             phys_a,
             MemoryPermissions {
                 r: pte.x,
                 w: pte.w,
                 x: pte.x,
             },
-        ));
+        );
     }
-    Ok((
-        phys_a,
-        MemoryPermissions {
-            r: pte.r,
-            w: pte.w,
-            x: pte.x,
-        },
-    ))
+    else {
+        res = (
+            phys_a,
+            MemoryPermissions {
+                r: pte.r,
+                w: pte.w,
+                x: pte.x,
+            },
+        );
+    }
+
+    let mut pte = pte.set_a();
+    match a_type {
+        AccessType::W => pte = pte.set_d(),
+        _ => {},
+    }
+    let pte_u32: u32 = pte.into();
+
+    phys_write_word(pte_addr, pte_u32, core)?;
+    
+    core.last_pa = phys_a;
+
+    return Ok(res);
 }

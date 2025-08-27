@@ -302,7 +302,7 @@ fn debug_r(core: &Core, instr: &RType) -> String {
     }
 }
 
-fn debug_i(core: &Core, instr: &IType) -> String {
+fn debug_i(core: &mut Core, instr: &IType) -> String {
     match instr.opcode {
         0b0010011 => {
             match instr.funct3 {
@@ -419,7 +419,7 @@ fn debug_i(core: &Core, instr: &IType) -> String {
                 0x2 => format!("lw\t(0x{}) = mem[(x{} + {:x})0x{:x}]", instr.rd, instr.rs1, instr.imm, addr),
 
                 // lbu zero-extended
-                0x4 => format!("lbu\t(0x{}) = mem[(x{} + {:x})0x{:x}]", instr.rd, instr.rs1, instr.imm, addr),
+                0x4 => format!("lbu\t(0x{}) = mem[(x{} + {:x})0x{:x}] 0x{:x}, pa: 0x{:08x}", instr.rd, instr.rs1, instr.imm, addr, memory::read_byte(addr, core).unwrap_or(0), core.last_pa),
 
                 // lhu
                 0x5 => format!("lhu\t(0x{}) = mem[(x{} + {:x})0x{:x}]", instr.rd, instr.rs1, instr.imm, addr),
@@ -651,7 +651,7 @@ fn debug_j(core: &Core, instr: &JType) -> String {
     }
 }
 
-pub fn debug_instr(core: &Core, byte_code: u32) -> String {
+pub fn debug_instr(core: &mut Core, byte_code: u32) -> String {
     let instr = Instruction::from(byte_code);
     match instr {
         Ok(x) => match x {

@@ -120,9 +120,6 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
     if addr == csr_addr(Csr::satp) as u32 {
         print!("satp write: 0x{:x} 0x{:x}", addr, data);
         println!("\t0x{:08x}", core.pc);
-        if data > 0 {
-            core.p_start = true;
-        }
     }
     let perm = permissions(addr);
     if perm.mode > core.mode || !perm.w {
