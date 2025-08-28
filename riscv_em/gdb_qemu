@@ -1,3 +1,5 @@
 set architecture riscv:rv32
 set disassemble-next-line on
 target remote :1234
+u *0x00001014
+

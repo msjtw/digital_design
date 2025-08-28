@@ -219,7 +219,7 @@ pub fn write_64(csr: Csr64, data: u64, core: &mut Core) {
 fn mirror(core: &mut Core) {
     // sstatus
     let mstatus = core.csr_file[csr_addr(Csr::mstatus)];
-    let mask = 0b10000001100011111110011111100011;
+    let mask = 0b10000001100011111110011101100010;
     core.csr_file[csr_addr(Csr::sstatus)] = mstatus & mask;
 
     // timers

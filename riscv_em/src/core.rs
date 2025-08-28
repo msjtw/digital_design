@@ -107,8 +107,8 @@ impl<'a> Core<'a> {
     }
 
     pub fn exec(&mut self) -> Result<State, Exception> {
-        if super::DEBUG && self.pc == 0xc02eb9c8 {
-            // self.p_start = true;
+        if super::DEBUG && self.pc == 0xc04067e4 {
+            self.p_start = true;
         }
 
         let mut mip = csr::read(Csr::mip, self);
@@ -295,18 +295,18 @@ impl<'a> Core<'a> {
             }
         }
 
-        let sstatus = csr::read(Csr::sstatus, self);
+        let mstatus = csr::read(Csr::mstatus, self);
         // save mode into spp
         let spp = (self.mode & 0b1) << 8;
         // save sie into spie
-        let spie = (sstatus & (0b01)) << 4;
+        let spie = (mstatus & (0b01)) << 4;
         // zero spp and spie fields
-        let mut sstatus = sstatus & !((0b1 << 8) | (0b1 << 5));
-        sstatus |= spp;
-        sstatus |= spie;
+        let mut mstatus = mstatus & !((0b100000000) | (0b100000));
+        mstatus |= spp;
+        mstatus |= spie;
         // disable interrupts
-        sstatus &= !0b10;
-        csr::write(Csr::sstatus, sstatus, self);
+        mstatus &= !0b10;
+        csr::write(Csr::mstatus, mstatus, self);
 
         // save pc
         csr::write(Csr::sepc, self.pc, self);
