@@ -352,7 +352,7 @@ pub fn phys_write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), excep
     if addr < memory.base_addr {
         match addr {
             0x10000000 => {
-                print!("{}", data as char);
+                // print!("{}", data as char);
                 let _ = std::io::stdout().flush();
             } // TODO: UART;
             0x11100000 => {} // TODO: SYSCON;

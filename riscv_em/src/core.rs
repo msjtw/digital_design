@@ -3,12 +3,12 @@ mod datapath;
 pub mod exceptions;
 mod instr_parse;
 
-mod instr_debug;
+// mod instr_debug;
+// use instr_debug::debug_instr;
 
 use crate::memory::{self};
 use csr::{Csr, Csr64};
 use exceptions::*;
-use instr_debug::debug_instr;
 use instr_parse::Instruction;
 use std::{fs, u32};
 
@@ -107,7 +107,7 @@ impl<'a> Core<'a> {
     }
 
     pub fn exec(&mut self) -> Result<State, Exception> {
-        if super::DEBUG && self.pc == 0xc04067e4 {
+        if super::DEBUG && self.pc == 0xc01f33b0 {
             self.p_start = true;
         }
 

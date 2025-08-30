@@ -463,20 +463,20 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                         }
                         // sret
                         0b000100000010 => {
-                            let mut sstatus = csr::read(super::Csr::sstatus, core);
+                            let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set spp = 0
-                            core.mode = (sstatus >> 8) & 0b1;
+                            core.mode = (mstatus >> 8) & 0b1;
                             if core.mode < 3 {
                                 let mut mstatus = csr::read(super::Csr::mstatus, core);
                                 mstatus = !(1 << 17) & mstatus;
                                 csr::write(super::Csr::mstatus, mstatus, core);
                             }
-                            sstatus &= !(0b1 << 8);
+                            mstatus &= !(0b1 << 8);
                             // restore sie and set spie to 1
-                            sstatus &= !0b10;
-                            sstatus |= (sstatus & 1 << 5) >> 4;
-                            sstatus |= 0b1 << 5;
-                            csr::write(super::Csr::sstatus, sstatus, core);
+                            mstatus &= !0b10;
+                            mstatus |= (mstatus & 1 << 5) >> 4;
+                            mstatus |= 0b1 << 5;
+                            csr::write(super::Csr::mstatus, mstatus, core);
                             // restore pc
                             core.pc = csr::read(super::Csr::sepc, core)
                         }
