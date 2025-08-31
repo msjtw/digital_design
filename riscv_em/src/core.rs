@@ -90,8 +90,6 @@ impl<'a> Core<'a> {
             let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
         }
 
-        // println!("dtb addr: 0x{:x}", dtb_addr);
-
         self.pc = 0x80000000;
         self.reg_file[5] = 0x80000000u32 as i32;
         self.reg_file[10] = 0x00; // hart ID
@@ -107,7 +105,7 @@ impl<'a> Core<'a> {
     }
 
     pub fn exec(&mut self) -> Result<State, Exception> {
-        if super::DEBUG && self.pc == 0xc01f33b0 {
+        if super::DEBUG && self.pc == 0xc0268d50 {
             self.p_start = true;
         }
 
@@ -151,7 +149,7 @@ impl<'a> Core<'a> {
                             print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
                             // println!("{}", debug_instr(self, fetch_result));
                             // if self.mtime > 788381 - 5 {
-                            print_state_gdb(self);
+                            // print_state_gdb(self);
                             // }
                         }
                         instr_fetch = fetch_result;
