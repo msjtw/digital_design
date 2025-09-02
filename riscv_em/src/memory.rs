@@ -43,7 +43,7 @@ pub fn read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exceptio
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
-            println!("mmu error 1 @0x{:08x}", addr);
+            // println!("mmu error 1 @0x{:08x}", addr);
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::Load_page_fault),
@@ -60,7 +60,7 @@ pub fn fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Excepti
             return Err(exceptions::Exception::Instruction_page_fault);
         }
         Err(x) => {
-            println!("mmu error 2");
+            // println!("mmu error 2");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::Instruction_page_fault),
@@ -77,7 +77,7 @@ pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Excepti
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
-            println!("mmu error 3");
+            // println!("mmu error 3");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::Load_page_fault),
@@ -94,7 +94,7 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
-            println!("mmu error 4");
+            // println!("mmu error 4");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::Load_page_fault),
@@ -103,9 +103,6 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
     };
 }
 pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
-    if addr == 0x9de00006 {
-        println!("write to 0x9de00006: 0x{:x}", data);
-    }
     match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
@@ -114,7 +111,7 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
-            println!("mmu error 5");
+            // println!("mmu error 5");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::StoreAMO_page_fault),
@@ -123,9 +120,6 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
     };
 }
 pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptions::Exception> {
-    if addr == 0x9de00006 {
-        println!("write to 0x9de00006: 0x{:x}", data);
-    }
     match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
@@ -134,7 +128,7 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
-            println!("mmu error 6");
+            // println!("mmu error 6");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::StoreAMO_page_fault),
@@ -143,9 +137,6 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
     };
 }
 pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions::Exception> {
-    if addr == 0x9de00006 {
-        println!("write to 0x9de00006: 0x{:x}", data);
-    }
     match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
@@ -154,7 +145,7 @@ pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
-            println!("mmu error 7");
+            // println!("mmu error 7");
             match x {
                 Some(x) => return Err(x),
                 None => return Err(exceptions::Exception::StoreAMO_page_fault),
@@ -166,7 +157,7 @@ pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions
 pub fn phys_read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 4, core);
     if !perm.r {
-        println!("1 Error! read:0x{:x}", addr);
+        // println!("1 Error! read:0x{:x}", addr);
         return Err(exceptions::Exception::Load_access_fault);
     }
 
@@ -179,7 +170,7 @@ pub fn phys_read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Excepti
             0x11004004 => Ok((core.mtimecmp >> 32) as u32),
             0x11004000 => Ok(core.mtimecmp as u32),
             _ => {
-                println!("2 Error! read:0x{:x}", addr);
+
                 Ok(0)
             }
         };
@@ -194,7 +185,7 @@ pub fn phys_read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Excepti
 pub fn phys_fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 4, core);
     if !perm.x {
-        println!("3 Error! read:0x{:x}", addr);
+        // println!("3 Error! read:0x{:x}", addr);
         return Err(exceptions::Exception::Instruction_access_fault);
     }
 
@@ -215,14 +206,14 @@ pub fn phys_fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Except
 pub fn phys_read_hword(addr: u32, core: &Core) -> Result<u16, exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 2, core);
     if !perm.r {
-        println!("5 Error! read:0x{:x}", addr);
+        // println!("5 Error! read:0x{:x}", addr);
         return Err(exceptions::Exception::Load_access_fault);
     }
 
     let memory = &core.memory;
 
     if addr < memory.base_addr {
-        println!("6 Error! read:0x{:x}", addr);
+        // println!("6 Error! read:0x{:x}", addr);
     }
 
     let address = (addr - memory.base_addr) as usize;
@@ -233,7 +224,7 @@ pub fn phys_read_hword(addr: u32, core: &Core) -> Result<u16, exceptions::Except
 pub fn phys_read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 1, core);
     if !perm.r {
-        println!("7 Error! read:0x{:x}", addr);
+        // println!("7 Error! read:0x{:x}", addr);
         return Err(exceptions::Exception::Load_access_fault);
     }
 
@@ -254,7 +245,10 @@ pub fn phys_read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exce
                 Ok(ret)
             }
             _ => {
-                println!("8 Error! read:0x{:x}", addr);
+                // println!("8 Error! read:0x{:x}", addr);
+                if addr >= 0x00001020 && addr - 0x00001020 < core.dtb.len() as u32 {
+                    return Ok(core.dtb[addr as usize - 0x00001020usize]);
+                }
                 Ok(0)
             }
         };
@@ -270,7 +264,7 @@ pub fn phys_write_word(
 ) -> Result<u32, exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 4, core);
     if !perm.w {
-        println!("9 Error! write:0x{:x}", addr);
+        // println!("9 Error! write:0x{:x}", addr);
         return Err(exceptions::Exception::Load_access_fault);
     }
 
@@ -299,7 +293,7 @@ pub fn phys_write_word(
                 core.mtimecmp = ((mtimecmph as u64) << 32) + data as u64;
             }
             _ => {
-                println!("10 Error! write:0x{:x}", addr);
+                // println!("10 Error! write:0x{:x}", addr);
             }
         };
         return Ok(0);
@@ -323,13 +317,13 @@ pub fn phys_write_hword(
 ) -> Result<(), exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 2, core);
     if !perm.w {
-        println!("11 Error! write:0x{:x}", addr);
+        // println!("11 Error! write:0x{:x}", addr);
         return Err(exceptions::Exception::Load_access_fault);
     }
     let memory = &mut core.memory;
 
     if addr < memory.base_addr {
-        println!("12 Error! write:0x{:x}", addr);
+        // println!("12 Error! write:0x{:x}", addr);
     }
 
     let address = (addr - memory.base_addr) as usize;
@@ -343,7 +337,7 @@ pub fn phys_write_hword(
 pub fn phys_write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 1, core);
     if !perm.w {
-        println!("13 Error! write:0x{:x}", addr);
+        // println!("13 Error! write:0x{:x}", addr);
         return Err(exceptions::Exception::Load_access_fault);
     }
 
@@ -352,12 +346,14 @@ pub fn phys_write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), excep
     if addr < memory.base_addr {
         match addr {
             0x10000000 => {
-                // print!("{}", data as char);
-                let _ = std::io::stdout().flush();
+                if !super::DEBUG {
+                    print!("{}", data as char);
+                    let _ = std::io::stdout().flush();
+                }
             } // TODO: UART;
             0x11100000 => {} // TODO: SYSCON;
             _ => {
-                println!("14 Error! write:0x{:x}", addr);
+                // println!("14 Error! write:0x{:x}", addr);
             }
         };
         return Ok(());

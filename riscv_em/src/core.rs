@@ -37,6 +37,8 @@ pub struct Core<'a> {
     pub mode: u32,
     wfi: bool, // wait for interrupt
 
+    pub dtb: Vec<u8>,
+
     pub instr_str: String,
     pub last_pa: u32,
     pub p_start: bool,
@@ -61,6 +63,8 @@ impl<'a> Core<'a> {
             mode: 0,
             wfi: false,
 
+            dtb: vec![],
+
             instr_str: String::new(),
             last_pa: 0,
             p_start: false,
@@ -84,17 +88,18 @@ impl<'a> Core<'a> {
         let mut dtb_addr = super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32;
         dtb_addr >>= 3;
         dtb_addr <<= 3;
-        dtb_addr = 0x83e00000u32;
+        // dtb_addr = 0x00001020;
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
             let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
+            // self.dtb.push(data[i]);
         }
 
         self.pc = 0x80000000;
-        self.reg_file[5] = 0x80000000u32 as i32;
+        self.reg_file[5] = 0x00001000u32 as i32;
         self.reg_file[10] = 0x00; // hart ID
         self.reg_file[11] = dtb_addr as i32;
-        self.reg_file[12] = 0x1028;
+        self.reg_file[12] = 0;
         csr::write(Csr::misa, 0b01000000000101000001000100000001, self);
         //                            zyxvwutsrqponmlkjihgfedcba
         //                            Spent a whole week looking for a problem,
@@ -105,7 +110,7 @@ impl<'a> Core<'a> {
     }
 
     pub fn exec(&mut self) -> Result<State, Exception> {
-        if super::DEBUG && self.pc == 0xc0268d50 {
+        if super::DEBUG && self.pc == 0xc04067e4 {
             self.p_start = true;
         }
 
@@ -146,7 +151,12 @@ impl<'a> Core<'a> {
                                 || self.p_start)
                         {
                             // print_state(self);
-                            print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
+                            print!("core   0: {} 0x{:x?} (0x{:08x?})\t", self.mode, self.pc, fetch_result);
+                            if super::SPIKE_DEBUG {
+                                print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
+                            } else {
+                                println!();
+                            }
                             // println!("{}", debug_instr(self, fetch_result));
                             // if self.mtime > 788381 - 5 {
                             // print_state_gdb(self);

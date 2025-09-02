@@ -1,4 +1,5 @@
 use crate::core::Core;
+use crate::core::csr::csr_name;
 use crate::core::instr_parse::{BType, IType, JType, RType, SType, UType};
 use crate::memory;
 
@@ -160,6 +161,9 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
 
                 _ => return Err(Exception::Illegal_instruction),
             };
+            if super::super::SPIKE_DEBUG {
+                println!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
+            }
             core.pc += 4;
         }
         0b0101111 => {
@@ -237,6 +241,12 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
             if write {
                 memory::write_word(addr, write_val as u32, core)?;
             }
+            if super::super::SPIKE_DEBUG {
+                println!(
+                    "x{} 0x{:08x} mem 0x{:08x} mem 0x{:08x} 0x{:08x}",
+                    instr.rd, core.reg_file[instr.rd as usize], addr, addr, write_val
+                );
+            }
             core.pc += 4;
         }
         _ => return Err(Exception::Illegal_instruction),
@@ -279,7 +289,8 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     //srli
                     0x00 => {
                         core.reg_file[instr.rd as usize] =
-                            (core.reg_file[instr.rs1 as usize] as u32 >> (instr.imm & 0b11111)) as i32;
+                            (core.reg_file[instr.rs1 as usize] as u32 >> (instr.imm & 0b11111))
+                                as i32;
                     }
                     //srai
                     0x20 => {
@@ -308,6 +319,9 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 _ => return Err(Exception::Illegal_instruction),
             };
+            if super::super::SPIKE_DEBUG {
+                println!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
+            }
             core.pc += 4;
         }
         0b0000011 => {
@@ -350,6 +364,12 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 _ => return Err(Exception::Illegal_instruction),
             };
+            if super::super::SPIKE_DEBUG {
+                println!(
+                    "x{} 0x{:08x} mem 0x{:08x}",
+                    instr.rd, core.reg_file[instr.rd as usize], addr
+                );
+            }
             core.pc += 4;
         }
         //jalr
@@ -358,9 +378,12 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
             core.pc =
                 (i64::from(core.reg_file[instr.rs1 as usize] as u32) + i64::from(instr.imm)) as u32;
             core.reg_file[instr.rd as usize] = (tmp_pc + 4) as i32;
+            if super::super::SPIKE_DEBUG {
+                println!();
+            }
         }
         0b1110011 => {
-            let csr_addr = (instr.imm & 0xfff ) as u32;
+            let csr_addr = (instr.imm & 0xfff) as u32;
             let source = core.reg_file[instr.rs1 as usize] as u32;
             match instr.funct3 {
                 // csrrw
@@ -371,6 +394,9 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     }
                     core.reg_file[instr.rd as usize] = csr as i32;
                     csr::write_addr(csr_addr, source, core)?;
+                    if super::super::SPIKE_DEBUG {
+                        println!("c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), source)
+                    }
                     core.pc += 4;
                 }
                 // csrrs
@@ -379,6 +405,14 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr | source, core)?;
+                        if super::super::SPIKE_DEBUG {
+                            println!(
+                                "c{}_{} 0x{:08x}",
+                                csr_addr,
+                                csr_name(csr_addr),
+                                csr | source
+                            )
+                        }
                     }
                     core.pc += 4;
                 }
@@ -388,6 +422,14 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr & !source, core)?;
+                        if super::super::SPIKE_DEBUG {
+                            println!(
+                                "c{}_{} 0x{:08x}",
+                                csr_addr,
+                                csr_name(csr_addr),
+                                csr & !source
+                            )
+                        }
                     }
                     core.pc += 4;
                 }
@@ -399,6 +441,9 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     }
                     core.reg_file[instr.rd as usize] = csr as i32;
                     csr::write_addr(csr_addr, instr.rs1, core)?;
+                    if super::super::SPIKE_DEBUG {
+                        println!("c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), instr.rs1)
+                    }
                     core.pc += 4;
                 }
                 // csrrsi
@@ -407,6 +452,14 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr | instr.rs1, core)?;
+                        if super::super::SPIKE_DEBUG {
+                            println!(
+                                "c{}_{} 0x{:08x}",
+                                csr_addr,
+                                csr_name(csr_addr),
+                                csr | instr.rs1
+                            )
+                        }
                     }
                     core.pc += 4;
                 }
@@ -416,14 +469,22 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr & !instr.rs1, core)?;
+                        if super::super::SPIKE_DEBUG {
+                            println!(
+                                "c{}_{} 0x{:08x}",
+                                csr_addr,
+                                csr_name(csr_addr),
+                                csr & !instr.rs1
+                            )
+                        }
                     }
                     core.pc += 4;
                 }
                 0b0 => {
                     //sfence
                     if instr.funct7 == 0b0001001 {
-                       core.pc += 4;
-                       return Ok(State::Ok)
+                        core.pc += 4;
+                        return Ok(State::Ok);
                     }
                     match instr.imm {
                         //ecall
@@ -489,12 +550,21 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                         }
                         _ => return Err(Exception::Illegal_instruction),
                     }
+
+                    if super::super::SPIKE_DEBUG {
+                        println!();
+                    }
                 }
                 _ => return Err(Exception::Illegal_instruction),
             };
         }
         // fence, pause
-        0b0001111 => core.pc += 4,
+        0b0001111 => {
+            if super::super::SPIKE_DEBUG {
+                println!();
+            }
+            core.pc += 4;
+        }
 
         _ => return Err(Exception::Illegal_instruction),
     };
@@ -504,6 +574,11 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
 pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, Exception> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
     let rs2 = core.reg_file[instr.rs2 as usize];
+
+    if super::super::SPIKE_DEBUG {
+        println!("mem 0x{:08x} 0x{:08x}", addr, rs2);
+    }
+
     let x = match instr.funct3 {
         //sb
         0x0 => match memory::write_byte(addr, rs2 as u8, core) {
@@ -580,6 +655,9 @@ pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, Exception> {
     if core.pc == last_pc {
         core.pc += 4;
     }
+    if super::super::SPIKE_DEBUG {
+        println!();
+    }
     Ok(State::Ok)
 }
 
@@ -596,6 +674,9 @@ pub fn exec_u(core: &mut Core, instr: &UType) -> Result<State, Exception> {
         }
         _ => return Err(Exception::Illegal_instruction),
     };
+    if super::super::SPIKE_DEBUG {
+        println!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
+    }
     core.pc += 4;
     Ok(State::Ok)
 }
@@ -609,5 +690,11 @@ pub fn exec_j(core: &mut Core, instr: &JType) -> Result<State, Exception> {
         }
         _ => return Err(Exception::Illegal_instruction),
     };
+    if super::super::SPIKE_DEBUG {
+        if instr.rd != 0 {
+            print!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
+        }
+        println!();
+    }
     Ok(State::Ok)
 }

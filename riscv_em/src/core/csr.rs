@@ -50,7 +50,7 @@ pub fn write_pmpXcfg(n: u32, data: u8, core: &mut Core) {
 pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
     // println!("csr read:  {}[0x{:x}] = 0x{:x}", csr_name(addr), addr, core.csr_file[addr as usize]);
     if addr == csr_addr(Csr::satp) as u32 {
-        println!("satp read: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
+        // println!("satp read: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
     }
     let perm = permissions(addr);
     if perm.mode > core.mode {
@@ -111,7 +111,7 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
             return Ok(core.csr_file[addr as usize]);
         }
     }
-    println!("Error csr read: 0x{:x}; Illegal address", addr);
+    // println!("Error csr read: 0x{:x}; Illegal address", addr);
     Err(Exception::Illegal_instruction)
 }
 
@@ -137,7 +137,7 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
             return Ok(());
         }
     }
-    println!("Error csr write: 0x{:x}; Illegal address", addr);
+    // println!("Error csr write: 0x{:x}; Illegal address", addr);
     Err(Exception::Illegal_instruction)
 }
 
