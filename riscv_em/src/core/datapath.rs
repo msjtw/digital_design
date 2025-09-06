@@ -161,7 +161,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
 
                 _ => return Err(Exception::Illegal_instruction),
             };
-            if super::super::SPIKE_DEBUG {
+            if core.p_start {
                 println!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
             }
             core.pc += 4;
@@ -241,7 +241,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
             if write {
                 memory::write_word(addr, write_val as u32, core)?;
             }
-            if super::super::SPIKE_DEBUG {
+            if core.p_start {
                 println!(
                     "x{} 0x{:08x} mem 0x{:08x} mem 0x{:08x} 0x{:08x}",
                     instr.rd, core.reg_file[instr.rd as usize], addr, addr, write_val
@@ -319,8 +319,11 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 _ => return Err(Exception::Illegal_instruction),
             };
-            if super::super::SPIKE_DEBUG {
+            if core.p_start && instr.rd != 0 {
                 println!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
+            }
+            else if core.p_start {
+                print!("\n")
             }
             core.pc += 4;
         }
@@ -364,7 +367,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 }
                 _ => return Err(Exception::Illegal_instruction),
             };
-            if super::super::SPIKE_DEBUG {
+            if core.p_start {
                 println!(
                     "x{} 0x{:08x} mem 0x{:08x}",
                     instr.rd, core.reg_file[instr.rd as usize], addr
@@ -378,8 +381,11 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
             core.pc =
                 (i64::from(core.reg_file[instr.rs1 as usize] as u32) + i64::from(instr.imm)) as u32;
             core.reg_file[instr.rd as usize] = (tmp_pc + 4) as i32;
-            if super::super::SPIKE_DEBUG {
-                println!();
+            if core.p_start && instr.rd != 0 {
+                println!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
+            }
+            else if core.p_start {
+                println!()
             }
         }
         0b1110011 => {
@@ -394,7 +400,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     }
                     core.reg_file[instr.rd as usize] = csr as i32;
                     csr::write_addr(csr_addr, source, core)?;
-                    if super::super::SPIKE_DEBUG {
+                    if core.p_start {
                         println!("c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), source)
                     }
                     core.pc += 4;
@@ -405,7 +411,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr | source, core)?;
-                        if super::super::SPIKE_DEBUG {
+                        if core.p_start {
                             println!(
                                 "c{}_{} 0x{:08x}",
                                 csr_addr,
@@ -422,7 +428,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr & !source, core)?;
-                        if super::super::SPIKE_DEBUG {
+                        if core.p_start {
                             println!(
                                 "c{}_{} 0x{:08x}",
                                 csr_addr,
@@ -441,7 +447,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     }
                     core.reg_file[instr.rd as usize] = csr as i32;
                     csr::write_addr(csr_addr, instr.rs1, core)?;
-                    if super::super::SPIKE_DEBUG {
+                    if core.p_start {
                         println!("c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), instr.rs1)
                     }
                     core.pc += 4;
@@ -452,7 +458,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr | instr.rs1, core)?;
-                        if super::super::SPIKE_DEBUG {
+                        if core.p_start {
                             println!(
                                 "c{}_{} 0x{:08x}",
                                 csr_addr,
@@ -469,7 +475,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.reg_file[instr.rd as usize] = csr as i32;
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr & !instr.rs1, core)?;
-                        if super::super::SPIKE_DEBUG {
+                        if core.p_start {
                             println!(
                                 "c{}_{} 0x{:08x}",
                                 csr_addr,
@@ -481,6 +487,9 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.pc += 4;
                 }
                 0b0 => {
+                    if core.p_start {
+                        println!();
+                    }
                     //sfence
                     if instr.funct7 == 0b0001001 {
                         core.pc += 4;
@@ -505,38 +514,36 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                         }
                         // mret
                         0b001100000010 => {
+                            println!("mret");
                             let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set mpp = 0
                             core.mode = (mstatus >> 11) & 0b11;
                             if core.mode < 3 {
-                                let mut mstatus = csr::read(super::Csr::mstatus, core);
-                                mstatus = !(1 << 17) & mstatus;
-                                csr::write(super::Csr::mstatus, mstatus, core);
+                                mstatus &= !(1 << 17);
                             }
                             mstatus &= !(0b11 << 11);
                             // restore mie and set mpie to 1
                             mstatus &= !0b1000;
-                            mstatus |= (mstatus & 1 << 7) >> 4;
-                            mstatus |= 1 << 7;
+                            mstatus |= (mstatus & 0b10000000) >> 4;
+                            mstatus |= 0b10000000;
                             csr::write(super::Csr::mstatus, mstatus, core);
                             // restore pc
                             core.pc = csr::read(super::Csr::mepc, core)
                         }
                         // sret
                         0b000100000010 => {
+                            println!("sret");
                             let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set spp = 0
                             core.mode = (mstatus >> 8) & 0b1;
                             if core.mode < 3 {
-                                let mut mstatus = csr::read(super::Csr::mstatus, core);
-                                mstatus = !(1 << 17) & mstatus;
-                                csr::write(super::Csr::mstatus, mstatus, core);
+                                mstatus &= !(1 << 17);
                             }
                             mstatus &= !(0b1 << 8);
                             // restore sie and set spie to 1
                             mstatus &= !0b10;
-                            mstatus |= (mstatus & 1 << 5) >> 4;
-                            mstatus |= 0b1 << 5;
+                            mstatus |= (mstatus & 0b100000) >> 4;
+                            mstatus |= 0b100000;
                             csr::write(super::Csr::mstatus, mstatus, core);
                             // restore pc
                             core.pc = csr::read(super::Csr::sepc, core)
@@ -551,16 +558,13 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                         _ => return Err(Exception::Illegal_instruction),
                     }
 
-                    if super::super::SPIKE_DEBUG {
-                        println!();
-                    }
                 }
                 _ => return Err(Exception::Illegal_instruction),
             };
         }
         // fence, pause
         0b0001111 => {
-            if super::super::SPIKE_DEBUG {
+            if core.p_start {
                 println!();
             }
             core.pc += 4;
@@ -575,7 +579,7 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, Exception> {
     let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
     let rs2 = core.reg_file[instr.rs2 as usize];
 
-    if super::super::SPIKE_DEBUG {
+    if core.p_start {
         println!("mem 0x{:08x} 0x{:08x}", addr, rs2);
     }
 
@@ -655,7 +659,7 @@ pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, Exception> {
     if core.pc == last_pc {
         core.pc += 4;
     }
-    if super::super::SPIKE_DEBUG {
+    if core.p_start {
         println!();
     }
     Ok(State::Ok)
@@ -674,7 +678,7 @@ pub fn exec_u(core: &mut Core, instr: &UType) -> Result<State, Exception> {
         }
         _ => return Err(Exception::Illegal_instruction),
     };
-    if super::super::SPIKE_DEBUG {
+    if core.p_start {
         println!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
     }
     core.pc += 4;
@@ -690,7 +694,7 @@ pub fn exec_j(core: &mut Core, instr: &JType) -> Result<State, Exception> {
         }
         _ => return Err(Exception::Illegal_instruction),
     };
-    if super::super::SPIKE_DEBUG {
+    if core.p_start {
         if instr.rd != 0 {
             print!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
         }

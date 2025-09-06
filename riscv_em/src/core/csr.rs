@@ -15,6 +15,10 @@ pub fn read(csr: Csr, core: &Core) -> u32 {
 
 pub fn write(csr: Csr, data: u32, core: &mut Core) {
     let addr = csr_addr(csr);
+    if addr == csr_addr(Csr::mstatus) {
+        print!("mstatus write name: 0x{:x} 0b{:b}", addr, data);
+        println!("\t0x{:08x}", core.pc);
+    }
     core.csr_file[addr] = data;
     mirror(core);
 }
@@ -119,6 +123,10 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
     // println!("csr write: {}[0x{:x}] <- 0x{:x}", csr_name(addr), addr, data);
     if addr == csr_addr(Csr::satp) as u32 {
         print!("satp write: 0x{:x} 0x{:x}", addr, data);
+        println!("\t0x{:08x}", core.pc);
+    }
+    if addr == csr_addr(Csr::mstatus) as u32 {
+        print!("mstatus write: 0x{:x} 0b{:b}", addr, data);
         println!("\t0x{:08x}", core.pc);
     }
     let perm = permissions(addr);

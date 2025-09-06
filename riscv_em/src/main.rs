@@ -11,8 +11,8 @@ use termion::raw::IntoRawMode;
 
 const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = true;
-const SPIKE_DEBUG: bool = true;
+const DEBUG: bool = false;
+const SPIKE_DEBUG: bool = false;
 const PRINT_START: u64 = 1e10 as u64;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -27,8 +27,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut proc = core::Core::new(&mut memory);
     proc.read_data(
         &args[1], //kernel Image
-        "/home/msjtw/Documents/digital_design/riscv_em/device_tree/sixtyfourmb.dtb",
+        "/home/msjtw/Documents/digital_design/riscv_em/device_tree/spike.dtb",
     )?;
+
+    let start_time = SystemTime::now();
 
     let mut ctr = 0;
     loop {
@@ -38,14 +40,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         // last_cycle = curr_cycle;
 
         ctr += 1;
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_micros() as u64;
-        proc.mtime = now;
+        let now = SystemTime::now().duration_since(start_time).unwrap().as_millis();
+        proc.mtime = now as u64;
 
         match proc.exec() {
             Ok(x) => match x {
                 core::State::Ok => {}
                 core::State::Sleep => {
-                    // println!("Sleep...");
+                    println!("Sleep... 0x{:08x} < 0x{:08x}; {}", proc.mtime, proc.mtimecmp, i128::from(proc.mtimecmp) - i128::from(proc.mtime));
+                    proc.sleep = true;
                     // let add_time = (proc.memory.csr_read(memory::Time::Mtimecmp) as i64
                     //     - proc.memory.csr_read(memory::Time::Mtime) as i64)
                     //     .max(0) as u32;

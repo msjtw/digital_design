@@ -42,6 +42,7 @@ pub struct Core<'a> {
     pub instr_str: String,
     pub last_pa: u32,
     pub p_start: bool,
+    pub sleep: bool,
 }
 
 impl<'a> Core<'a> {
@@ -68,6 +69,7 @@ impl<'a> Core<'a> {
             instr_str: String::new(),
             last_pa: 0,
             p_start: false,
+            sleep: false,
         }
     }
 
@@ -115,7 +117,10 @@ impl<'a> Core<'a> {
         }
 
         let mut mip = csr::read(Csr::mip, self);
-        if self.mtime > self.mtimecmp {
+        if self.mtime >= self.mtimecmp {
+            if self.sleep {
+                println!("timer");
+            }
             mip |= 1 << 7;
             self.wfi = false;
         } else {
@@ -133,8 +138,12 @@ impl<'a> Core<'a> {
         let mstatus = csr::read(Csr::mstatus, self);
         let mie = csr::read(Csr::mie, self);
         let mip = csr::read(Csr::mip, self);
+        if self.sleep {
+            println!("mode: {} mstatus: 0b{:b} mie: 0b{:b}, mip: 0b{:b}",self.mode, mstatus, mie, mip);
+        }
         if (mstatus & 1 << 3) != 0 && (mie & 1 << 7) != 0 && (mip & 1 << 7) != 0 {
             // machine timer interrupt
+            println!("timer trap");
             self.trap = 0x80000007;
         } else {
             if self.pc & 0b11 > 0 {
@@ -152,10 +161,8 @@ impl<'a> Core<'a> {
                         {
                             // print_state(self);
                             print!("core   0: {} 0x{:x?} (0x{:08x?})\t", self.mode, self.pc, fetch_result);
-                            if super::SPIKE_DEBUG {
+                            if !super::SPIKE_DEBUG {
                                 print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
-                            } else {
-                                println!();
                             }
                             // println!("{}", debug_instr(self, fetch_result));
                             // if self.mtime > 788381 - 5 {
@@ -192,7 +199,7 @@ impl<'a> Core<'a> {
         self.reg_file[0] = 0;
 
         if self.trap != u32::MAX {
-            // println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
@@ -244,7 +251,7 @@ impl<'a> Core<'a> {
         // save mode into mpp
         let mpp = (self.mode & 0b11) << 11;
         // save mie into mpie
-        let mpie = (mstatus & (1 << 3)) << 4;
+        let mpie = (mstatus & 0b1000) << 4;
         // zero mpp and mpie fields
         let mut mstatus = mstatus & !((0b11 << 11) | (0b1 << 7));
         mstatus |= mpp;
@@ -307,7 +314,7 @@ impl<'a> Core<'a> {
         // save mode into spp
         let spp = (self.mode & 0b1) << 8;
         // save sie into spie
-        let spie = (mstatus & (0b01)) << 4;
+        let spie = (mstatus & (0b10)) << 4;
         // zero spp and spie fields
         let mut mstatus = mstatus & !((0b100000000) | (0b100000));
         mstatus |= spp;
