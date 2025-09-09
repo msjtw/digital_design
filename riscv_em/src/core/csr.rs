@@ -15,10 +15,10 @@ pub fn read(csr: Csr, core: &Core) -> u32 {
 
 pub fn write(csr: Csr, data: u32, core: &mut Core) {
     let addr = csr_addr(csr);
-    if addr == csr_addr(Csr::mstatus) {
-        print!("mstatus write name: 0x{:x} 0b{:b}", addr, data);
-        println!("\t0x{:08x}", core.pc);
-    }
+    // if addr == csr_addr(Csr::mstatus) {
+    //     print!("mstatus write name: 0x{:x} 0b{:b}", addr, data);
+    //     println!("\t0x{:08x}", core.pc);
+    // }
     core.csr_file[addr] = data;
     mirror(core);
 }
@@ -56,11 +56,13 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
     if addr == csr_addr(Csr::satp) as u32 {
         // println!("satp read: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
     }
-    let perm = permissions(addr);
-    if perm.mode > core.mode {
-        println!("Error csr read: 0x{:x}; No permisions {:?}", addr, perm);
-        return Err(Exception::Illegal_instruction);
-    }
+
+    // let perm = permissions(addr);
+    // if perm.mode > core.mode {
+    //     println!("Error csr read: 0x{:x}; No permisions {:?}", addr, perm);
+    //     return Err(Exception::Illegal_instruction);
+    // }
+
     // mcounteren
     if (addr == 0xC00 || addr == 0xC80)
         && (core.csr_file[csr_addr(Csr::mcounteren)] & 0b1) == 0
@@ -121,22 +123,23 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
 
 pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception> {
     // println!("csr write: {}[0x{:x}] <- 0x{:x}", csr_name(addr), addr, data);
-    if addr == csr_addr(Csr::satp) as u32 {
-        print!("satp write: 0x{:x} 0x{:x}", addr, data);
-        println!("\t0x{:08x}", core.pc);
-    }
-    if addr == csr_addr(Csr::mstatus) as u32 {
-        print!("mstatus write: 0x{:x} 0b{:b}", addr, data);
-        println!("\t0x{:08x}", core.pc);
-    }
-    let perm = permissions(addr);
-    if perm.mode > core.mode || !perm.w {
-        println!(
-            "Error csr write: 0x{:x} 0x{:x}; No permisions: {:?}",
-            addr, data, perm
-        );
-        return Err(Exception::Illegal_instruction);
-    }
+    // if addr == csr_addr(Csr::satp) as u32 {
+    //     print!("satp write: 0x{:x} 0x{:x}", addr, data);
+    //     println!("\t0x{:08x}", core.pc);
+    // }
+    // if addr == csr_addr(Csr::mstatus) as u32 {
+    //     print!("mstatus write: 0x{:x} 0b{:b}", addr, data);
+    //     println!("\t0x{:08x}", core.pc);
+    // }
+    
+    // let perm = permissions(addr);
+    // if perm.mode > core.mode || !perm.w {
+    //     println!(
+    //         "Error csr write: 0x{:x} 0x{:x}; No permisions: {:?}",
+    //         addr, data, perm
+    //     );
+    //     return Err(Exception::Illegal_instruction);
+    // }
 
     for laddr in LEGAL_ADRESSES {
         if laddr == addr {

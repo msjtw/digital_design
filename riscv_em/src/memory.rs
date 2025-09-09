@@ -165,12 +165,18 @@ pub fn phys_read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Excepti
 
     if addr < memory.base_addr {
         return match addr {
-            0x1100bffc => Ok((core.mtime >> 32) as u32),
-            0x1100bff8 => Ok(core.mtime as u32),
+            0x200bffc => Ok((core.mtime >> 32) as u32),
+            0x200bff8 => Ok(core.mtime as u32),
             // 0x11004004 => Ok((core.mtimecmp >> 32) as u32),
             // 0x11004000 => Ok(core.mtimecmp as u32),
             _ => {
-
+                if addr >= 0x00001020 && addr - 0x00001020 < core.dtb.len() as u32 {
+                    let d = core.dtb[addr as usize - 0x00001020usize] as u32;
+                    let c = core.dtb[addr as usize - 0x0000101fusize] as u32;
+                    let b = core.dtb[addr as usize - 0x0000101eusize] as u32;
+                    let a = core.dtb[addr as usize - 0x0000101dusize] as u32;
+                    return Ok((a << 24) + (b << 16) + (c << 8) + d);
+                    }
                 Ok(0)
             }
         };
@@ -284,11 +290,11 @@ pub fn phys_write_word(
             //     let mtimeh = (core.mtime >> 32) as u32;
             //     core.mtime = ((mtimeh as u64) << 32) + data as u64;
             // }
-            0x11004004 => {
+            0x2004004 => {
                 let mtimecmpl = core.mtimecmp as u32;
                 core.mtimecmp = ((data as u64) << 32) + mtimecmpl as u64;
             }
-            0x11004000 => {
+            0x2004000 => {
                 let mtimecmph = (core.mtimecmp >> 32) as u32;
                 core.mtimecmp = ((mtimecmph as u64) << 32) + data as u64;
             }

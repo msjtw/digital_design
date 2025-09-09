@@ -199,6 +199,12 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
                         write_val = 0;
                     }
                     core.lr_valid = false;
+                    if core.p_start {
+                        println!(
+                            " x{} 0x{:08x} mem 0x{:08x} 0x{:08x}",
+                            instr.rd, core.reg_file[instr.rd as usize], addr, write_val
+                        )
+                    }
                 }
                 // amoswap.w
                 0b00001 => {
@@ -241,11 +247,20 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
             if write {
                 memory::write_word(addr, write_val as u32, core)?;
             }
-            if core.p_start {
-                println!(
-                    "x{} 0x{:08x} mem 0x{:08x} mem 0x{:08x} 0x{:08x}",
-                    instr.rd, core.reg_file[instr.rd as usize], addr, addr, write_val
-                );
+            if core.p_start && (instr.funct5 != 0b00011) {
+                if instr.rd == 0 {
+                    print!("mem 0x{:08x}", addr,);
+                } else {
+                    print!(
+                        "x{} 0x{:08x} mem 0x{:08x} ",
+                        instr.rd, core.reg_file[instr.rd as usize], addr,
+                    );
+                }
+                if write {
+                    println!(" mem 0x{:08x} 0x{:08x}", addr, write_val);
+                } else {
+                    println!();
+                }
             }
             core.pc += 4;
         }
@@ -321,8 +336,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
             };
             if core.p_start && instr.rd != 0 {
                 println!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
-            }
-            else if core.p_start {
+            } else if core.p_start {
                 print!("\n")
             }
             core.pc += 4;
@@ -383,8 +397,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
             core.reg_file[instr.rd as usize] = (tmp_pc + 4) as i32;
             if core.p_start && instr.rd != 0 {
                 println!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
-            }
-            else if core.p_start {
+            } else if core.p_start {
                 println!()
             }
         }
@@ -397,44 +410,100 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     let mut csr = 0;
                     if instr.rd != 0 {
                         csr = csr::read_addr(csr_addr, core)?;
+                        core.reg_file[instr.rd as usize] = csr as i32;
                     }
-                    core.reg_file[instr.rd as usize] = csr as i32;
                     csr::write_addr(csr_addr, source, core)?;
+                    if core.p_start && instr.rd != 0 {
+                        print!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
+                    }
                     if core.p_start {
-                        println!("c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), source)
+                        if csr_addr == 0x100 {
+                            print!(" c768_mstatus 0x{:08x}", csr::read(csr::Csr::mstatus, core))
+                        } else {
+                            print!(" c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), source)
+                        }
+                    }
+                    if core.p_start {
+                        print!("\n")
                     }
                     core.pc += 4;
                 }
                 // csrrs
                 0b010 => {
-                    let csr = csr::read_addr(csr_addr, core)?;
+                    let csr;
+                    match csr::read_addr(csr_addr, core) {
+                        Ok(x) => csr = x,
+                        Err(e) => {
+                            if core.p_start {
+                                print!("\n")
+                            }
+                            return Err(e);
+                        }
+                    };
                     core.reg_file[instr.rd as usize] = csr as i32;
+                    if core.p_start && instr.rd != 0 {
+                        print!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
+                    }
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr | source, core)?;
                         if core.p_start {
-                            println!(
-                                "c{}_{} 0x{:08x}",
-                                csr_addr,
-                                csr_name(csr_addr),
-                                csr | source
-                            )
+                            if csr_addr == 0x100 {
+                                println!(
+                                    " c768_mstatus 0x{:08x}",
+                                    csr::read(csr::Csr::mstatus, core)
+                                )
+                            } else {
+                                println!(
+                                    " c{}_{} 0x{:08x}",
+                                    csr_addr,
+                                    csr_name(csr_addr),
+                                    csr | source
+                                )
+                            }
+                        }
+                    } else {
+                        if core.p_start {
+                            print!("\n")
                         }
                     }
                     core.pc += 4;
                 }
                 // csrrc
                 0b011 => {
-                    let csr = csr::read_addr(csr_addr, core)?;
+                    let csr;
+                    match csr::read_addr(csr_addr, core) {
+                        Ok(x) => csr = x,
+                        Err(e) => {
+                            if core.p_start {
+                                print!("\n")
+                            }
+                            return Err(e);
+                        }
+                    };
                     core.reg_file[instr.rd as usize] = csr as i32;
+                    if core.p_start && instr.rd != 0 {
+                        print!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
+                    }
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr & !source, core)?;
                         if core.p_start {
-                            println!(
-                                "c{}_{} 0x{:08x}",
-                                csr_addr,
-                                csr_name(csr_addr),
-                                csr & !source
-                            )
+                            if csr_addr == 0x100 {
+                                println!(
+                                    " c768_mstatus 0x{:08x}",
+                                    csr::read(csr::Csr::mstatus, core)
+                                )
+                            } else {
+                                println!(
+                                    " c{}_{} 0x{:08x}",
+                                    csr_addr,
+                                    csr_name(csr_addr),
+                                    csr & !source
+                                )
+                            }
+                        }
+                    } else {
+                        if core.p_start {
+                            print!("\n")
                         }
                     }
                     core.pc += 4;
@@ -446,48 +515,98 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                         csr = csr::read_addr(csr_addr, core)?;
                     }
                     core.reg_file[instr.rd as usize] = csr as i32;
+                    if core.p_start && instr.rd != 0 {
+                        print!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
+                    }
                     csr::write_addr(csr_addr, instr.rs1, core)?;
                     if core.p_start {
-                        println!("c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), instr.rs1)
+                        if csr_addr == 0x100 {
+                            print!(" c768_mstatus 0x{:08x}", csr::read(csr::Csr::mstatus, core))
+                        } else {
+                            print!(" c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), instr.rs1)
+                        }
                     }
                     core.pc += 4;
                 }
                 // csrrsi
                 0b110 => {
-                    let csr = csr::read_addr(csr_addr, core)?;
+                    let csr;
+                    match csr::read_addr(csr_addr, core) {
+                        Ok(x) => csr = x,
+                        Err(e) => {
+                            if core.p_start {
+                                print!("\n")
+                            }
+                            return Err(e);
+                        }
+                    };
                     core.reg_file[instr.rd as usize] = csr as i32;
+                    if core.p_start && instr.rd != 0 {
+                        print!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
+                    }
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr | instr.rs1, core)?;
                         if core.p_start {
-                            println!(
-                                "c{}_{} 0x{:08x}",
-                                csr_addr,
-                                csr_name(csr_addr),
-                                csr | instr.rs1
-                            )
+                            if csr_addr == 0x100 {
+                                println!(
+                                    " c768_mstatus 0x{:08x}",
+                                    csr::read(csr::Csr::mstatus, core)
+                                )
+                            } else {
+                                println!(
+                                    " c{}_{} 0x{:08x}",
+                                    csr_addr,
+                                    csr_name(csr_addr),
+                                    csr | instr.rs1
+                                )
+                            }
+                        }
+                    } else {
+                        if core.p_start {
+                            print!("\n")
                         }
                     }
                     core.pc += 4;
                 }
                 // csrrci
                 0b111 => {
-                    let csr = csr::read_addr(csr_addr, core)?;
+                    let csr;
+                    match csr::read_addr(csr_addr, core) {
+                        Ok(x) => csr = x,
+                        Err(e) => {
+                            if core.p_start {
+                                print!("\n")
+                            }
+                            return Err(e);
+                        }
+                    };
                     core.reg_file[instr.rd as usize] = csr as i32;
+                    if core.p_start && instr.rd != 0 {
+                        print!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
+                    }
                     if instr.rs1 != 0 {
                         csr::write_addr(csr_addr, csr & !instr.rs1, core)?;
                         if core.p_start {
-                            println!(
-                                "c{}_{} 0x{:08x}",
-                                csr_addr,
-                                csr_name(csr_addr),
-                                csr & !instr.rs1
-                            )
+                            if csr_addr == 0x100 {
+                                println!(" c768_mstatus 0x{:08x}", csr::read(csr::Csr::mstatus, core))
+                            } else {
+                                println!(
+                                    " c{}_{} 0x{:08x}",
+                                    csr_addr,
+                                    csr_name(csr_addr),
+                                    csr & !instr.rs1
+                                )
+                            }
+                        }
+                    } else {
+                        if core.p_start {
+                            print!("\n")
                         }
                     }
                     core.pc += 4;
                 }
                 0b0 => {
-                    if core.p_start {
+                    if core.p_start && instr.imm != 0b001100000010  {
                         println!();
                     }
                     //sfence
@@ -514,7 +633,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                         }
                         // mret
                         0b001100000010 => {
-                            println!("mret");
+                            // println!("mret");
                             let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set mpp = 0
                             core.mode = (mstatus >> 11) & 0b11;
@@ -528,11 +647,14 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                             mstatus |= 0b10000000;
                             csr::write(super::Csr::mstatus, mstatus, core);
                             // restore pc
-                            core.pc = csr::read(super::Csr::mepc, core)
+                            core.pc = csr::read(super::Csr::mepc, core);
+                            if core.p_start {
+                                println!(" c768_mstatus 0x{:08x} c784_mstatush 0x{:08x}", csr::read(csr::Csr::mstatus, core), csr::read(csr::Csr::mstatush, core))
+                            }
                         }
                         // sret
                         0b000100000010 => {
-                            println!("sret");
+                            // println!("sret");
                             let mut mstatus = csr::read(super::Csr::mstatus, core);
                             // restore last mode and set spp = 0
                             core.mode = (mstatus >> 8) & 0b1;
@@ -546,7 +668,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                             mstatus |= 0b100000;
                             csr::write(super::Csr::mstatus, mstatus, core);
                             // restore pc
-                            core.pc = csr::read(super::Csr::sepc, core)
+                            core.pc = csr::read(super::Csr::sepc, core);
                         }
                         // wfi
                         0b000100000101 => {
@@ -580,7 +702,15 @@ pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, Exception> {
     let rs2 = core.reg_file[instr.rs2 as usize];
 
     if core.p_start {
-        println!("mem 0x{:08x} 0x{:08x}", addr, rs2);
+        match instr.funct3 {
+            //sb
+            0x0 => println!("mem 0x{:08x} 0x{:02x}", addr, rs2 as u8),
+            //sh
+            0x1 => println!("mem 0x{:08x} 0x{:04x}", addr, rs2 as u16),
+            //sw
+            0x2 => println!("mem 0x{:08x} 0x{:08x}", addr, rs2),
+            _ => {}
+        };
     }
 
     let x = match instr.funct3 {

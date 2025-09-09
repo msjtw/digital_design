@@ -222,19 +222,19 @@ pub fn translate(
 
     if !pte.v || (!pte.r && pte.w) {
         // page fault
-        println!("*-------");
-        println!("mode: {}, pc: 0x{:08x}", core.mode, core.pc);
-        println!("{}", core.instr_str);
-        println!("satp 0b{:b}", csr::read(csr::Csr::satp, core));
-        println!("satp {:?}", satp);
-        println!("a:   0x{:x}", a);
-
-        println!("va 0b{:032b}", virt_a);
-        println!("va 0x{:08x}", virt_a);
-        println!("va {:?}", va);
-        println!("page fault 1");
-        println!("pte *0x{:08x} {:?}", a + index, pte);
-        println!("+-------");
+        // println!("*-------");
+        // println!("mode: {}, pc: 0x{:08x}", core.mode, core.pc);
+        // println!("{}", core.instr_str);
+        // println!("satp 0b{:b}", csr::read(csr::Csr::satp, core));
+        // println!("satp {:?}", satp);
+        // println!("a:   0x{:x}", a);
+        //
+        // println!("va 0b{:032b}", virt_a);
+        // println!("va 0x{:08x}", virt_a);
+        // println!("va {:?}", va);
+        // println!("page fault 1");
+        // println!("pte *0x{:08x} {:?}", a + index, pte);
+        // println!("+-------");
         return Err(None);
     }
 

@@ -90,11 +90,14 @@ impl<'a> Core<'a> {
         let mut dtb_addr = super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32;
         dtb_addr >>= 3;
         dtb_addr <<= 3;
-        // dtb_addr = 0x00001020;
+        dtb_addr = 0x00001020;
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
-            let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
-            // self.dtb.push(data[i]);
+            // let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
+            self.dtb.push(data[i]);
+        }
+        while self.dtb.len() % 4 != 0 {
+            self.dtb.push(0);
         }
 
         self.pc = 0x80000000;
@@ -108,19 +111,20 @@ impl<'a> Core<'a> {
         //                            ... I missed q in alphabet.
         csr::write(Csr::menvcfgh, 0b00010000000000000000000000000000, self);
         csr::write(Csr::menvcfg, 0b00000000000000000000000000000000, self);
+        csr::write(Csr::marchid, 0x5, self);
         Ok(())
     }
 
     pub fn exec(&mut self) -> Result<State, Exception> {
-        if super::DEBUG && self.pc == 0xc04067e4 {
+        if super::DEBUG && (self.pc == 0x80400094 || csr::read_64(Csr64::mcycle, self) > super::PRINT_START) {
             self.p_start = true;
         }
 
         let mut mip = csr::read(Csr::mip, self);
         if self.mtime >= self.mtimecmp {
-            if self.sleep {
-                println!("timer");
-            }
+            // if self.sleep {
+            //     println!("timer");
+            // }
             mip |= 1 << 7;
             self.wfi = false;
         } else {
@@ -138,12 +142,12 @@ impl<'a> Core<'a> {
         let mstatus = csr::read(Csr::mstatus, self);
         let mie = csr::read(Csr::mie, self);
         let mip = csr::read(Csr::mip, self);
-        if self.sleep {
-            println!("mode: {} mstatus: 0b{:b} mie: 0b{:b}, mip: 0b{:b}",self.mode, mstatus, mie, mip);
-        }
+        // if self.sleep {
+        //     println!("mode: {} mstatus: 0b{:b} mie: 0b{:b}, mip: 0b{:b}",self.mode, mstatus, mie, mip);
+        // }
         if (mstatus & 1 << 3) != 0 && (mie & 1 << 7) != 0 && (mip & 1 << 7) != 0 {
             // machine timer interrupt
-            println!("timer trap");
+            // println!("timer trap");
             self.trap = 0x80000007;
         } else {
             if self.pc & 0b11 > 0 {
@@ -159,11 +163,14 @@ impl<'a> Core<'a> {
                             && (csr::read_64(Csr64::mcycle, self) > super::PRINT_START
                                 || self.p_start)
                         {
+                            // if fetch_result != 0x00000073 {
+                                print!("core   0: {} 0x{:x?} (0x{:08x?})\t", self.mode, self.pc, fetch_result);
+                                if !super::SPIKE_DEBUG {
+                                    print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
+                                }
+                            // }
                             // print_state(self);
-                            print!("core   0: {} 0x{:x?} (0x{:08x?})\t", self.mode, self.pc, fetch_result);
-                            if !super::SPIKE_DEBUG {
-                                print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
-                            }
+
                             // println!("{}", debug_instr(self, fetch_result));
                             // if self.mtime > 788381 - 5 {
                             // print_state_gdb(self);
@@ -199,7 +206,7 @@ impl<'a> Core<'a> {
         self.reg_file[0] = 0;
 
         if self.trap != u32::MAX {
-            println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            // println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
@@ -241,9 +248,9 @@ impl<'a> Core<'a> {
             csr::write(Csr::mcause, self.trap, self);
             if self.trap > 4 && self.trap <= 7 {
                 // address misaligned, access fault, ecall
-                csr::write(Csr::mtval, self.trap_val, self);
+                // csr::write(Csr::mtval, self.trap_val, self);
             } else {
-                csr::write(Csr::mtval, self.pc, self);
+                // csr::write(Csr::mtval, self.pc, self);
             }
         }
 
