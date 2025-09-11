@@ -418,13 +418,10 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     }
                     if core.p_start {
                         if csr_addr == 0x100 {
-                            print!(" c768_mstatus 0x{:08x}", csr::read(csr::Csr::mstatus, core))
+                            println!(" c768_mstatus 0x{:08x}", csr::read(csr::Csr::mstatus, core))
                         } else {
-                            print!(" c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), source)
+                            println!(" c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), source)
                         }
-                    }
-                    if core.p_start {
-                        print!("\n")
                     }
                     core.pc += 4;
                 }
@@ -521,9 +518,9 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     csr::write_addr(csr_addr, instr.rs1, core)?;
                     if core.p_start {
                         if csr_addr == 0x100 {
-                            print!(" c768_mstatus 0x{:08x}", csr::read(csr::Csr::mstatus, core))
+                            println!(" c768_mstatus 0x{:08x}", csr::read(csr::Csr::mstatus, core))
                         } else {
-                            print!(" c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), instr.rs1)
+                            println!(" c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), instr.rs1)
                         }
                     }
                     core.pc += 4;

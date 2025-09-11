@@ -31,7 +31,7 @@ pub struct Core<'a> {
     pub mtimecmp: u64,
 
     trap: u32,
-    trap_val: u32,
+    pub trap_val: u32,
     lr_address: u32,
     lr_valid: bool,
     pub mode: u32,
@@ -169,6 +169,9 @@ impl<'a> Core<'a> {
                                     print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
                                 }
                             // }
+                            if self.pc == 0xc02b3cf8 {
+                                print!("--0b{:b}--0b{:b}--", self.csr_file[0x306], self.csr_file[0x106]);
+                            }
                             // print_state(self);
 
                             // println!("{}", debug_instr(self, fetch_result));
@@ -207,6 +210,9 @@ impl<'a> Core<'a> {
 
         if self.trap != u32::MAX {
             // println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            if self.trap == 2 {
+                self.trap_val = instr_fetch;
+            }
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
@@ -246,11 +252,12 @@ impl<'a> Core<'a> {
         } else {
             // exception
             csr::write(Csr::mcause, self.trap, self);
-            if self.trap > 4 && self.trap <= 7 {
-                // address misaligned, access fault, ecall
-                // csr::write(Csr::mtval, self.trap_val, self);
+            if   self.trap <= 7 || (self.trap >= 12 && self.trap <= 15) {
+                // breakpoint (3); address-misaligned (0, 4, 6);
+                // access-fault (1, 5, 7); page-fault(12, 13, 15)
+                csr::write(Csr::mtval, self.trap_val, self);
             } else {
-                // csr::write(Csr::mtval, self.pc, self);
+                csr::write(Csr::mtval, 0, self);
             }
         }
 

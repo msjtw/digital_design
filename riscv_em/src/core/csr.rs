@@ -57,11 +57,11 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
         // println!("satp read: 0x{:x} 0x{:x}", addr, core.csr_file[addr as usize]);
     }
 
-    // let perm = permissions(addr);
-    // if perm.mode > core.mode {
-    //     println!("Error csr read: 0x{:x}; No permisions {:?}", addr, perm);
-    //     return Err(Exception::Illegal_instruction);
-    // }
+    let perm = permissions(addr);
+    if perm.mode > core.mode {
+        println!("Error csr read: 0x{:x}; No permisions {:?}", addr, perm);
+        return Err(Exception::Illegal_instruction);
+    }
 
     // mcounteren
     if (addr == 0xC00 || addr == 0xC80)
@@ -132,14 +132,14 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
     //     println!("\t0x{:08x}", core.pc);
     // }
     
-    // let perm = permissions(addr);
-    // if perm.mode > core.mode || !perm.w {
-    //     println!(
-    //         "Error csr write: 0x{:x} 0x{:x}; No permisions: {:?}",
-    //         addr, data, perm
-    //     );
-    //     return Err(Exception::Illegal_instruction);
-    // }
+    let perm = permissions(addr);
+    if perm.mode > core.mode || !perm.w {
+        println!(
+            "Error csr write: 0x{:x} 0x{:x}; No permisions: {:?}",
+            addr, data, perm
+        );
+        return Err(Exception::Illegal_instruction);
+    }
 
     for laddr in LEGAL_ADRESSES {
         if laddr == addr {
@@ -252,6 +252,8 @@ fn mirror(core: &mut Core) {
     //hmpcounters?
 
     //mcounteren
+    core.csr_file[csr_addr(Csr::mcounteren)] = 0;
+    core.csr_file[csr_addr(Csr::scounteren)] = 0;
     core.csr_file[csr_addr(Csr::mcountinhibit)] = 0;
     core.csr_file[csr_addr(Csr::scountinhibit)] = 0;
 

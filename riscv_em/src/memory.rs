@@ -4,8 +4,8 @@ mod sv32;
 use crate::core::{Core, exceptions};
 use std::io::Write;
 use std::io::{Bytes, Read};
-use termion::async_stdin;
 use sv32::AccessType;
+use termion::async_stdin;
 
 // #[derive(Debug)]
 pub struct Memory {
@@ -40,13 +40,17 @@ pub fn read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exceptio
             if perm.r {
                 return phys_read_word(phys_addr, core);
             }
+            core.trap_val = addr;
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
             // println!("mmu error 1 @0x{:08x}", addr);
             match x {
                 Some(x) => return Err(x),
-                None => return Err(exceptions::Exception::Load_page_fault),
+                None => {
+                    core.trap_val = addr;
+                    return Err(exceptions::Exception::Load_page_fault);
+                }
             };
         }
     };
@@ -57,13 +61,17 @@ pub fn fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Excepti
             if perm.x {
                 return phys_fetch_word(phys_addr, core);
             }
+            core.trap_val = addr;
             return Err(exceptions::Exception::Instruction_page_fault);
         }
         Err(x) => {
             // println!("mmu error 2");
             match x {
                 Some(x) => return Err(x),
-                None => return Err(exceptions::Exception::Instruction_page_fault),
+                None => {
+                    core.trap_val = addr;
+                    return Err(exceptions::Exception::Instruction_page_fault);
+                }
             };
         }
     };
@@ -74,13 +82,17 @@ pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Excepti
             if perm.r {
                 return phys_read_hword(phys_addr, core);
             }
+            core.trap_val = addr;
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
             // println!("mmu error 3");
             match x {
                 Some(x) => return Err(x),
-                None => return Err(exceptions::Exception::Load_page_fault),
+                None => {
+                    core.trap_val = addr;
+                    return Err(exceptions::Exception::Load_page_fault);
+                }
             };
         }
     };
@@ -91,13 +103,17 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
             if perm.r {
                 return phys_read_byte(phys_addr, core);
             }
+            core.trap_val = addr;
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
             // println!("mmu error 4");
             match x {
                 Some(x) => return Err(x),
-                None => return Err(exceptions::Exception::Load_page_fault),
+                None => {
+                    core.trap_val = addr;
+                    return Err(exceptions::Exception::Load_page_fault);
+                }
             };
         }
     };
@@ -108,13 +124,17 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
             if perm.w {
                 return phys_write_word(phys_addr, data, core);
             }
+            core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
             // println!("mmu error 5");
             match x {
                 Some(x) => return Err(x),
-                None => return Err(exceptions::Exception::StoreAMO_page_fault),
+                None => {
+                    core.trap_val = addr;
+                    return Err(exceptions::Exception::StoreAMO_page_fault);
+                }
             };
         }
     };
@@ -125,13 +145,17 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
             if perm.w {
                 return phys_write_hword(phys_addr, data, core);
             }
+            core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
             // println!("mmu error 6");
             match x {
                 Some(x) => return Err(x),
-                None => return Err(exceptions::Exception::StoreAMO_page_fault),
+                None => {
+                    core.trap_val = addr;
+                    return Err(exceptions::Exception::StoreAMO_page_fault);
+                }
             };
         }
     };
@@ -142,22 +166,27 @@ pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions
             if perm.w {
                 return phys_write_byte(phys_addr, data, core);
             }
+            core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
             // println!("mmu error 7");
             match x {
                 Some(x) => return Err(x),
-                None => return Err(exceptions::Exception::StoreAMO_page_fault),
+                None => {
+                    core.trap_val = addr;
+                    return Err(exceptions::Exception::StoreAMO_page_fault);
+                }
             };
         }
     };
 }
 
-pub fn phys_read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
+pub fn phys_read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 4, core);
     if !perm.r {
         // println!("1 Error! read:0x{:x}", addr);
+        core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 
@@ -176,7 +205,7 @@ pub fn phys_read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Excepti
                     let b = core.dtb[addr as usize - 0x0000101eusize] as u32;
                     let a = core.dtb[addr as usize - 0x0000101dusize] as u32;
                     return Ok((a << 24) + (b << 16) + (c << 8) + d);
-                    }
+                }
                 Ok(0)
             }
         };
@@ -188,10 +217,11 @@ pub fn phys_read_word(addr: u32, core: &Core) -> Result<u32, exceptions::Excepti
     let a = memory.data[address + 3] as u32;
     Ok((a << 24) + (b << 16) + (c << 8) + d)
 }
-pub fn phys_fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Exception> {
+pub fn phys_fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 4, core);
     if !perm.x {
         // println!("3 Error! read:0x{:x}", addr);
+        core.trap_val = addr;
         return Err(exceptions::Exception::Instruction_access_fault);
     }
 
@@ -199,7 +229,11 @@ pub fn phys_fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Except
 
     if addr > super::RAM_OFFSET + super::RAM_SIZE {
         // return Err(exceptions::Exception::Instruction_access_fault);
-        println!("max: 0x{:x} < 0x{:x}",super::RAM_OFFSET + super::RAM_SIZE, addr);
+        println!(
+            "max: 0x{:x} < 0x{:x}",
+            super::RAM_OFFSET + super::RAM_SIZE,
+            addr
+        );
     }
     let address = (addr - memory.base_addr) as usize;
     let d = memory.data[address] as u32;
@@ -209,10 +243,11 @@ pub fn phys_fetch_word(addr: u32, core: &Core) -> Result<u32, exceptions::Except
     Ok((a << 24) + (b << 16) + (c << 8) + d)
 }
 
-pub fn phys_read_hword(addr: u32, core: &Core) -> Result<u16, exceptions::Exception> {
+pub fn phys_read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 2, core);
     if !perm.r {
         // println!("5 Error! read:0x{:x}", addr);
+        core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 
@@ -231,6 +266,7 @@ pub fn phys_read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exce
     let perm = pmp::pmp_check(addr, 1, core);
     if !perm.r {
         // println!("7 Error! read:0x{:x}", addr);
+        core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 
@@ -271,6 +307,7 @@ pub fn phys_write_word(
     let perm = pmp::pmp_check(addr, 4, core);
     if !perm.w {
         // println!("9 Error! write:0x{:x}", addr);
+        core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 
@@ -324,6 +361,7 @@ pub fn phys_write_hword(
     let perm = pmp::pmp_check(addr, 2, core);
     if !perm.w {
         // println!("11 Error! write:0x{:x}", addr);
+        core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
     let memory = &mut core.memory;
@@ -344,6 +382,7 @@ pub fn phys_write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), excep
     let perm = pmp::pmp_check(addr, 1, core);
     if !perm.w {
         // println!("13 Error! write:0x{:x}", addr);
+        core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 

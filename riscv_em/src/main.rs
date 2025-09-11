@@ -13,7 +13,7 @@ const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
 const DEBUG: bool = true;
 const SPIKE_DEBUG: bool = true;
-const PRINT_START: u64 = 0x80400094 as u64;
+const PRINT_START: u64 = 0 as u64;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
