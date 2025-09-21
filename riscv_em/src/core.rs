@@ -12,6 +12,9 @@ use exceptions::*;
 use instr_parse::Instruction;
 use std::{fs, u32};
 
+// there is no trap with this number
+const TRAP_CLEAR: u32 = u32::MAX;
+
 #[derive(Debug)]
 pub enum State {
     Ok,
@@ -56,8 +59,7 @@ impl<'a> Core<'a> {
             mtime: 0,
             mtimecmp: 0,
 
-            // there is no trap with this number
-            trap: u32::MAX,
+            trap: TRAP_CLEAR,
             trap_val: 0,
             lr_address: 0,
             lr_valid: false,
@@ -125,10 +127,10 @@ impl<'a> Core<'a> {
             // if self.sleep {
             //     println!("timer");
             // }
-            mip |= 1 << 7;
+            mip |= 0b10000000;
             self.wfi = false;
         } else {
-            mip &= !(1 << 7);
+            mip &= !0b10000000;
         }
         csr::write(Csr::mip, mip, self);
 
@@ -142,14 +144,18 @@ impl<'a> Core<'a> {
         let mstatus = csr::read(Csr::mstatus, self);
         let mie = csr::read(Csr::mie, self);
         let mip = csr::read(Csr::mip, self);
-        // if self.sleep {
+        if self.sleep {
         //     println!("mode: {} mstatus: 0b{:b} mie: 0b{:b}, mip: 0b{:b}",self.mode, mstatus, mie, mip);
-        // }
-        if (mstatus & 1 << 3) != 0 && (mie & 1 << 7) != 0 && (mip & 1 << 7) != 0 {
+        }
+        // if ((self.mode == 3 && (mstatus & 0b1000 != 0)) || (self.mode < 3)) && (mie & mip & 0b10000000 != 0) {
+        if  mie & mip & 0b10000000 != 0 {
             // machine timer interrupt
-            // println!("timer trap");
-            self.trap = 0x80000007;
-        } else {
+            if self.mode < 3 || (self.mode == 3 && mstatus & 0b1000 != 0) {
+                println!("timer trap");
+                self.trap = 0x80000007;
+            }
+        }
+        if self.trap == TRAP_CLEAR {
             if self.pc & 0b11 > 0 {
                 // check instruction address aligment
                 self.trap = 0;
@@ -163,14 +169,14 @@ impl<'a> Core<'a> {
                             && (csr::read_64(Csr64::mcycle, self) > super::PRINT_START
                                 || self.p_start)
                         {
-                            // if fetch_result != 0x00000073 {
+                            if fetch_result != 0x00000073 {
                                 print!("core   0: {} 0x{:x?} (0x{:08x?})\t", self.mode, self.pc, fetch_result);
                                 if !super::SPIKE_DEBUG {
                                     print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
                                 }
-                            // }
+                            }
                             if self.pc == 0xc02b3cf8 {
-                                print!("--0b{:b}--0b{:b}--", self.csr_file[0x306], self.csr_file[0x106]);
+                                // print!("--0b{:b}--0b{:b}--", self.csr_file[0x306], self.csr_file[0x106]);
                             }
                             // print_state(self);
 
@@ -216,7 +222,7 @@ impl<'a> Core<'a> {
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
-                if self.trap & mideleg > 0 && self.mode < 3 {
+                if (1 << (self.trap - 0x80000000)) & mideleg > 0 && self.mode < 3 {
                     self.s_mode_trap_handler();
                 } else {
                     self.m_mode_trap_handler();
@@ -299,7 +305,7 @@ impl<'a> Core<'a> {
         // enter machine mode
         self.mode = 3;
         // clear trap
-        self.trap = u32::MAX;
+        self.trap = TRAP_CLEAR;
     }
 
     fn s_mode_trap_handler(&mut self) {
@@ -362,7 +368,7 @@ impl<'a> Core<'a> {
         // enter supervisor mode
         self.mode = 1;
         // clear trap
-        self.trap = u32::MAX;
+        self.trap = TRAP_CLEAR;
     }
 }
 pub fn print_state(core: &Core) {

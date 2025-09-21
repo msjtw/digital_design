@@ -603,7 +603,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                     core.pc += 4;
                 }
                 0b0 => {
-                    if core.p_start && instr.imm != 0b001100000010  {
+                    if core.p_start && instr.imm != 0b001100000010 && instr.imm != 0 {
                         println!();
                     }
                     //sfence
