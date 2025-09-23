@@ -124,9 +124,9 @@ impl<'a> Core<'a> {
 
         let mut mip = csr::read(Csr::mip, self);
         if self.mtime >= self.mtimecmp {
-            // if self.sleep {
-            //     println!("timer");
-            // }
+            if self.sleep {
+                println!("timer");
+            }
             mip |= 0b10000000;
             self.wfi = false;
         } else {
@@ -148,11 +148,14 @@ impl<'a> Core<'a> {
         //     println!("mode: {} mstatus: 0b{:b} mie: 0b{:b}, mip: 0b{:b}",self.mode, mstatus, mie, mip);
         }
         // if ((self.mode == 3 && (mstatus & 0b1000 != 0)) || (self.mode < 3)) && (mie & mip & 0b10000000 != 0) {
-        if  mie & mip & 0b10000000 != 0 {
+        if self.mode < 3 || (self.mode == 3 && mstatus & 0b1000 != 0) {
             // machine timer interrupt
-            if self.mode < 3 || (self.mode == 3 && mstatus & 0b1000 != 0) {
-                println!("timer trap");
+            if  mie & mip & 0b10000000 != 0 {
                 self.trap = 0x80000007;
+            }
+            // supervisor timer interrupt
+            if  mie & mip & 0b100000 != 0 {
+                self.trap = 0x80000005;
             }
         }
         if self.trap == TRAP_CLEAR {
@@ -215,7 +218,7 @@ impl<'a> Core<'a> {
         self.reg_file[0] = 0;
 
         if self.trap != u32::MAX {
-            // println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
             if self.trap == 2 {
                 self.trap_val = instr_fetch;
             }
@@ -246,7 +249,7 @@ impl<'a> Core<'a> {
 
     fn m_mode_trap_handler(&mut self) {
         // Machine mode trap handler
-        // println!("mmode trap");
+        println!("mmode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("mmode trap");
@@ -310,7 +313,7 @@ impl<'a> Core<'a> {
 
     fn s_mode_trap_handler(&mut self) {
         // Supervisor mode trap handler
-        // println!("smode trap");
+        println!("smode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("smode trap");

@@ -126,10 +126,9 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
     //     print!("satp write: 0x{:x} 0x{:x}", addr, data);
     //     println!("\t0x{:08x}", core.pc);
     // }
-    // if addr == csr_addr(Csr::mstatus) as u32 {
-    //     print!("mstatus write: 0x{:x} 0b{:b}", addr, data);
-    //     println!("\t0x{:08x}", core.pc);
-    // }
+    if addr == csr_addr(Csr::mie) as u32 {
+        print!("mie write: 0b{:b}", data);
+    }
 
     let perm = permissions(addr);
     if perm.mode > core.mode || !perm.w {
@@ -271,7 +270,7 @@ struct Csrpermissions {
 }
 
 fn permissions(addr: u32) -> Csrpermissions {
-    let mode = (addr & (0b11 << 8)) >> 8;
+    let mode = (addr & 0b1100000000) >> 8;
     let rw = (addr & (0b11 << 10)) >> 10;
     let w = rw < 0b11;
     Csrpermissions { mode, w }
