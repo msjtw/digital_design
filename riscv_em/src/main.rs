@@ -11,8 +11,8 @@ use termion::raw::IntoRawMode;
 
 const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = true;
-const SPIKE_DEBUG: bool = true;
+const DEBUG: bool = false;
+const SPIKE_DEBUG: bool = false;
 const PRINT_START: u64 = 1e10 as u64;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "/home/msjtw/Documents/digital_design/riscv_em/device_tree/spike.dtb",
     )?;
 
-    let start_time = SystemTime::now();
+    let mut last_time = SystemTime::now();
 
     let mut ctr = 0;
     loop {
@@ -40,8 +40,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         // last_cycle = curr_cycle;
 
         ctr += 1;
-        let now = SystemTime::now().duration_since(start_time).unwrap().as_millis();
-        proc.mtime = ctr as u64;
+        let time_diff = SystemTime::now().duration_since(last_time).unwrap().as_millis();
+        last_time = SystemTime::now();
+        proc.mtime += time_diff as u64;
 
         match proc.exec() {
             Ok(x) => match x {
@@ -49,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 core::State::Sleep => {
                     println!("Sleep... 0x{:08x} < 0x{:08x}; {}", proc.mtime, proc.mtimecmp, i128::from(proc.mtimecmp) - i128::from(proc.mtime));
                     println!("mie: 0b{:b}", proc.csr_file[0x304]);
-                    // ctr = proc.mtimecmp;
+                    proc.mtime = proc.mtime.max(proc.mtimecmp);
                     // proc.sleep = true;
                     // let add_time = (proc.memory.csr_read(memory::Time::Mtimecmp) as i64
                     //     - proc.memory.csr_read(memory::Time::Mtime) as i64)
