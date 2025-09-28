@@ -128,6 +128,15 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
     // }
     if addr == csr_addr(Csr::mie) as u32 {
         print!("mie write: 0b{:b}", data);
+        println!("\t0x{:08x}", core.pc);
+    }
+    if addr == csr_addr(Csr::mcountinhibit) as u32 {
+        print!("mcountinhibit write: 0b{:b}", data);
+        println!("\t0x{:08x}", core.pc);
+    }
+    if addr == csr_addr(Csr::mcounteren) as u32 {
+        print!("mcounteren write: 0b{:b}", data);
+        println!("\t0x{:08x}", core.pc);
     }
 
     let perm = permissions(addr);
@@ -187,7 +196,6 @@ pub fn read_64(csr: Csr64, core: &Core) -> u64 {
 }
 
 pub fn write_64(csr: Csr64, data: u64, core: &mut Core) {
-    let mcountinhibit = core.csr_file[csr_addr(Csr::mcountinhibit)];
     match csr {
         Csr64::cycle => {
             core.csr_file[csr_addr(Csr::cycle)] = data as u32;
@@ -202,16 +210,12 @@ pub fn write_64(csr: Csr64, data: u64, core: &mut Core) {
             core.csr_file[csr_addr(Csr::instreth)] = (data >> 32) as u32;
         }
         Csr64::mcycle => {
-            if (mcountinhibit & 0b1) == 0 {
-                core.csr_file[csr_addr(Csr::mcycle)] = data as u32;
-                core.csr_file[csr_addr(Csr::mcycleh)] = (data >> 32) as u32;
-            }
+            core.csr_file[csr_addr(Csr::mcycle)] = data as u32;
+            core.csr_file[csr_addr(Csr::mcycleh)] = (data >> 32) as u32;
         }
         Csr64::minstret => {
-            if (mcountinhibit & 0b100) == 0 {
-                core.csr_file[csr_addr(Csr::minstret)] = data as u32;
-                core.csr_file[csr_addr(Csr::minstreth)] = (data >> 32) as u32;
-            }
+            core.csr_file[csr_addr(Csr::minstret)] = data as u32;
+            core.csr_file[csr_addr(Csr::minstreth)] = (data >> 32) as u32;
         }
         Csr64::medeleg => {
             core.csr_file[csr_addr(Csr::medeleg)] = data as u32;

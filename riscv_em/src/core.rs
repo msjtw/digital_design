@@ -163,8 +163,10 @@ impl<'a> Core<'a> {
                 // check instruction address aligment
                 self.trap = 0;
             } else {
-                let cycle = csr::read_64(Csr64::mcycle, self);
-                csr::write_64(Csr64::mcycle, cycle + 1, self);
+                if (csr::read(Csr::mcountinhibit, self) & 0b1) == 0 {
+                    let cycle = csr::read_64(Csr64::mcycle, self);
+                    csr::write_64(Csr64::mcycle, cycle + 1, self);
+                }
 
                 match memory::fetch_word(self.pc, self) {
                     Ok(fetch_result) => {
@@ -218,7 +220,7 @@ impl<'a> Core<'a> {
         self.reg_file[0] = 0;
 
         if self.trap != u32::MAX {
-            println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            // println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
             if self.trap == 2 {
                 self.trap_val = instr_fetch;
             }
@@ -240,8 +242,10 @@ impl<'a> Core<'a> {
                 }
             }
         } else {
-            let minstret = csr::read_64(Csr64::minstret, self);
-            csr::write_64(Csr64::minstret, minstret + 1, self);
+            if (csr::read(Csr::mcountinhibit, self) & 0b100) == 0 {
+                let minstret = csr::read_64(Csr64::minstret, self);
+                csr::write_64(Csr64::minstret, minstret + 1, self);
+            }
         }
 
         Ok(State::Ok)
@@ -249,7 +253,7 @@ impl<'a> Core<'a> {
 
     fn m_mode_trap_handler(&mut self) {
         // Machine mode trap handler
-        println!("mmode trap");
+        // println!("mmode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("mmode trap");
