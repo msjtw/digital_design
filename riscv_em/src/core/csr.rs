@@ -62,6 +62,11 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
         return Err(Exception::Illegal_instruction);
     }
 
+    // trap time read from m-mode
+    if (addr == 0xC01 || addr == 0xC81) && core.mode == 3 {
+        return Err(Exception::Illegal_instruction);
+    }
+
     // mcounteren
     if (addr == 0xC00 || addr == 0xC80)
         && (core.csr_file[csr_addr(Csr::mcounteren)] & 0b1) == 0
@@ -260,11 +265,15 @@ fn mirror(core: &mut Core) {
     core.csr_file[csr_addr(Csr::scountinhibit)] = 0;
 
     // sip, sie
-    let mie = core.csr_file[csr_addr(Csr::mie)];
-    let mip = core.csr_file[csr_addr(Csr::mip)];
-    let mideleg = core.csr_file[csr_addr(Csr::mideleg)];
-    core.csr_file[csr_addr(Csr::sie)] = mie & mideleg;
-    core.csr_file[csr_addr(Csr::sip)] = mip & mideleg;
+    let mask = 0b1000100010;
+    let sie = core.csr_file[csr_addr(Csr::sie)];
+    let sip = core.csr_file[csr_addr(Csr::sip)];
+    let mie = core.csr_file[csr_addr(Csr::mie)] | (sie & mask);
+    let mip = core.csr_file[csr_addr(Csr::mip)] | (sip & mask);
+    core.csr_file[csr_addr(Csr::sie)] = mie & mask;
+    core.csr_file[csr_addr(Csr::sip)] = mip & mask;
+    core.csr_file[csr_addr(Csr::mie)] = mie;
+    core.csr_file[csr_addr(Csr::mip)] = mip;
 }
 
 #[derive(Debug)]

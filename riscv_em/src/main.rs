@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 core::State::Sleep => {
                     println!("Sleep... 0x{:08x} < 0x{:08x}; {}", proc.mtime, proc.mtimecmp, i128::from(proc.mtimecmp) - i128::from(proc.mtime));
                     // println!("mie: 0b{:b}", proc.csr_file[0x304]);
-                    ctr = proc.mtimecmp;
+                    ctr = ctr.max(proc.mtimecmp);
                     // proc.mtime = proc.mtime.max(proc.mtimecmp);
                     // proc.sleep = true;
                     // let add_time = (proc.memory.csr_read(memory::Time::Mtimecmp) as i64

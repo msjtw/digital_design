@@ -124,9 +124,6 @@ impl<'a> Core<'a> {
 
         let mut mip = csr::read(Csr::mip, self);
         if self.mtime >= self.mtimecmp {
-            if self.sleep {
-                println!("timer");
-            }
             mip |= 0b10000000;
             self.wfi = false;
         } else {
@@ -144,20 +141,22 @@ impl<'a> Core<'a> {
         let mstatus = csr::read(Csr::mstatus, self);
         let mie = csr::read(Csr::mie, self);
         let mip = csr::read(Csr::mip, self);
-        if self.sleep {
-        //     println!("mode: {} mstatus: 0b{:b} mie: 0b{:b}, mip: 0b{:b}",self.mode, mstatus, mie, mip);
-        }
-        // if ((self.mode == 3 && (mstatus & 0b1000 != 0)) || (self.mode < 3)) && (mie & mip & 0b10000000 != 0) {
+        
         if self.mode < 3 || (self.mode == 3 && mstatus & 0b1000 != 0) {
             // machine timer interrupt
             if  mie & mip & 0b10000000 != 0 {
                 self.trap = 0x80000007;
+                // println!("mti");
             }
+        }
+        if self.mode < 1 || (self.mode == 1 && mstatus & 0b10 != 0) {
             // supervisor timer interrupt
             if  mie & mip & 0b100000 != 0 {
                 self.trap = 0x80000005;
+                // println!("sti");
             }
         }
+
         if self.trap == TRAP_CLEAR {
             if self.pc & 0b11 > 0 {
                 // check instruction address aligment
@@ -227,7 +226,7 @@ impl<'a> Core<'a> {
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
-                if (1 << (self.trap - 0x80000000)) & mideleg > 0 && self.mode < 3 {
+                if (1 << (self.trap - 0x80000000)) & mideleg > 0  {
                     self.s_mode_trap_handler();
                 } else {
                     self.m_mode_trap_handler();
@@ -235,7 +234,7 @@ impl<'a> Core<'a> {
             } else {
                 // exception
                 let medeleg = csr::read(Csr::medeleg, self);
-                if (1 << self.trap) & medeleg > 0 && self.mode < 3 {
+                if (1 << self.trap) & medeleg > 0  {
                     self.s_mode_trap_handler();
                 } else {
                     self.m_mode_trap_handler();
@@ -317,7 +316,7 @@ impl<'a> Core<'a> {
 
     fn s_mode_trap_handler(&mut self) {
         // Supervisor mode trap handler
-        println!("smode trap");
+        // println!("smode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("smode trap");
