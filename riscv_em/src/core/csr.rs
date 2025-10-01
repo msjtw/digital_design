@@ -143,6 +143,10 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
         print!("mcounteren write: 0b{:b}", data);
         println!("\t0x{:08x}", core.pc);
     }
+    if addr == csr_addr(Csr::mideleg) as u32 {
+        print!("mideleg write: 0b{:b}", data);
+        println!("\t0x{:08x}", core.pc);
+    }
 
     let perm = permissions(addr);
     if perm.mode > core.mode || !perm.w {
@@ -153,13 +157,54 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
         return Err(Exception::Illegal_instruction);
     }
 
-    for laddr in LEGAL_ADRESSES {
-        if laddr == addr {
-            core.csr_file[addr as usize] = data;
-            mirror(core);
+    let status_mask = 0b10000001100011111110011101100010;
+    let interrupt_mask = 0b1000100010;
+    let mideleg = core.csr_file[csr_addr(Csr::mideleg)];
+
+    match addr {
+        0x100 => {
+            // sstatus
+            let sstatus = data & status_mask;
+            core.csr_file[0x100] = sstatus;
+            let mut mstatus = core.csr_file[0x300];
+            mstatus &= !status_mask;
+            mstatus |= sstatus;
+            core.csr_file[0x300] = mstatus;
+            return Ok(());
+        },
+        0x104 => {
+            // sie
+            let sie = data & interrupt_mask;
+            core.csr_file[0x104] = sie;
+            let mut mie = core.csr_file[0x304];
+            mie &= !interrupt_mask;
+            mie |= sie;
+            core.csr_file[0x304] = mie;
             return Ok(());
         }
+        0x300 => {
+            // mstatus
+            core.csr_file[0x300] = data;
+            core.csr_file[0x100] = data & status_mask;
+            return Ok(());
+        }
+        0x304 => {
+            // mie
+            core.csr_file[0x304] = data;
+            core.csr_file[0x104] = data & interrupt_mask & mideleg;
+            return Ok(());
+        }
+        _ => {
+            for laddr in LEGAL_ADRESSES {
+                if laddr == addr {
+                    core.csr_file[addr as usize] = data;
+                    mirror(core);
+                    return Ok(());
+                }
+            }
+        }
     }
+
     // println!("Error csr write: 0x{:x}; Illegal address", addr);
     Err(Exception::Illegal_instruction)
 }
@@ -235,13 +280,6 @@ pub fn write_64(csr: Csr64, data: u64, core: &mut Core) {
 }
 
 fn mirror(core: &mut Core) {
-    // sstatus
-    let mstatus = core.csr_file[csr_addr(Csr::mstatus)];
-    let sstatus = core.csr_file[csr_addr(Csr::sstatus)];
-    let mask = 0b10000001100011111110011101100010;
-    let mstatus = mstatus | (sstatus & mask);
-    core.csr_file[csr_addr(Csr::sstatus)] = mstatus & mask;
-    core.csr_file[csr_addr(Csr::mstatus)] = mstatus;
 
     // timers
     let mcycle = core.csr_file[csr_addr(Csr::mcycle)];
@@ -263,17 +301,6 @@ fn mirror(core: &mut Core) {
     core.csr_file[csr_addr(Csr::scounteren)] = 0;
     core.csr_file[csr_addr(Csr::mcountinhibit)] = 0;
     core.csr_file[csr_addr(Csr::scountinhibit)] = 0;
-
-    // sip, sie
-    let mask = 0b1000100010;
-    let sie = core.csr_file[csr_addr(Csr::sie)];
-    let sip = core.csr_file[csr_addr(Csr::sip)];
-    let mie = core.csr_file[csr_addr(Csr::mie)] | (sie & mask);
-    let mip = core.csr_file[csr_addr(Csr::mip)] | (sip & mask);
-    core.csr_file[csr_addr(Csr::sie)] = mie & mask;
-    core.csr_file[csr_addr(Csr::sip)] = mip & mask;
-    core.csr_file[csr_addr(Csr::mie)] = mie;
-    core.csr_file[csr_addr(Csr::mip)] = mip;
 }
 
 #[derive(Debug)]

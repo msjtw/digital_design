@@ -142,18 +142,35 @@ impl<'a> Core<'a> {
         let mie = csr::read(Csr::mie, self);
         let mip = csr::read(Csr::mip, self);
         
-        if self.mode < 3 || (self.mode == 3 && mstatus & 0b1000 != 0) {
-            // machine timer interrupt
+        if self.mode == 3 {
+            // machine interrupts only taken when MIE is set
+            if mstatus & 0b1000 != 0 {
+                if  mie & mip & 0b10000000 != 0 {
+                    println!("mmode m timer");
+                    self.trap = 0x80000007;
+                }
+            }
+            // supervisor interrupts are never taken
+        } else if self.mode == 1 {
+            // machine interrupts are always taken
+            if  mie & mip & 0b10000000 != 0 {
+                println!("smode m timer");
+                self.trap = 0x80000007;
+            }
+            // supervisor interrupts only taken when SIE is set
+            if mstatus & 0b10 != 0 {
+                if  mie & mip & 0b100000 != 0 {
+                    println!("smode s timer");
+                    self.trap = 0x80000005;
+                }
+            }
+        } else if self.mode == 0 {
+            // all inerrupts are always taken
             if  mie & mip & 0b10000000 != 0 {
                 self.trap = 0x80000007;
-                // println!("mti");
             }
-        }
-        if self.mode < 1 || (self.mode == 1 && mstatus & 0b10 != 0) {
-            // supervisor timer interrupt
             if  mie & mip & 0b100000 != 0 {
                 self.trap = 0x80000005;
-                // println!("sti");
             }
         }
 
@@ -226,7 +243,7 @@ impl<'a> Core<'a> {
             if (self.trap as i32) < 0 {
                 //interrupt
                 let mideleg = csr::read(Csr::mideleg, self);
-                if (1 << (self.trap - 0x80000000)) & mideleg > 0  {
+                if (1 << (self.trap - 0x80000000)) & mideleg > 0 && self.mode < 3 {
                     self.s_mode_trap_handler();
                 } else {
                     self.m_mode_trap_handler();
@@ -234,7 +251,7 @@ impl<'a> Core<'a> {
             } else {
                 // exception
                 let medeleg = csr::read(Csr::medeleg, self);
-                if (1 << self.trap) & medeleg > 0  {
+                if (1 << self.trap) & medeleg > 0 && self.mode < 3 {
                     self.s_mode_trap_handler();
                 } else {
                     self.m_mode_trap_handler();
@@ -252,7 +269,7 @@ impl<'a> Core<'a> {
 
     fn m_mode_trap_handler(&mut self) {
         // Machine mode trap handler
-        // println!("mmode trap");
+        println!("mmode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("mmode trap");
@@ -316,7 +333,7 @@ impl<'a> Core<'a> {
 
     fn s_mode_trap_handler(&mut self) {
         // Supervisor mode trap handler
-        // println!("smode trap");
+        println!("smode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("smode trap");
@@ -342,12 +359,15 @@ impl<'a> Core<'a> {
         // save sie into spie
         let spie = (mstatus & (0b10)) << 4;
         // zero spp and spie fields
-        let mut mstatus = mstatus & !((0b100000000) | (0b100000));
+        let mut mstatus = mstatus & !0b100100000;
         mstatus |= spp;
         mstatus |= spie;
         // disable interrupts
         mstatus &= !0b10;
         csr::write(Csr::mstatus, mstatus, self);
+        println!("--0b{:b}", mstatus);
+        let mstatus = csr::read(Csr::mstatus, self);
+        println!("==0b{:b}", mstatus);
 
         // save pc
         csr::write(Csr::sepc, self.pc, self);
