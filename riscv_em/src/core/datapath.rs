@@ -669,7 +669,6 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                         }
                         // wfi
                         0b000100000101 => {
-                            println!("wfi");
                             // *core.csr(super::Csr::Mstatus) |= 1 << 3;
                             core.wfi = true;
                             core.pc += 4;

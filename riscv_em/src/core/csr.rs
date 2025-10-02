@@ -5,7 +5,8 @@ static LEGAL_ADRESSES: [u32; 61] = [
     0xB80, 0xB02, 0xB82, 0x344, 0x144, 0x304, 0x104, 0x305, 0x105, 0x341, 0x141, 0x342, 0x142,
     0x343, 0x143, 0x302, 0x312, 0x303, 0x300, 0x310, 0x100, 0x180, 0x301, 0x3A0, 0x3A1, 0x3A2,
     0x3A3, 0x3B0, 0x3B1, 0x3B2, 0x3B3, 0x3B4, 0x3B5, 0x3B6, 0x3B7, 0x3B8, 0x3B9, 0x3BA, 0x3BB,
-    0x3BC, 0x3BD, 0x3BE, 0x3BF, 0x306, 0x106, 0x30A, 0x31A, 0x320];
+    0x3BC, 0x3BD, 0x3BE, 0x3BF, 0x306, 0x106, 0x30A, 0x31A, 0x320,
+];
 
 pub fn read(csr: Csr, core: &Core) -> u32 {
     let addr = csr_addr(csr);
@@ -18,8 +19,46 @@ pub fn write(csr: Csr, data: u32, core: &mut Core) {
     //     print!("mstatus write name: 0x{:x} 0b{:b}", addr, data);
     //     println!("\t0x{:08x}", core.pc);
     // }
+
+    let status_mask = 0b10000001100011111110011101100010;
+    let interrupt_mask = 0b1000100010;
+    let mideleg = core.csr_file[csr_addr(Csr::mideleg)];
+
+    match addr {
+        0x100 => {
+            // sstatus
+            let sstatus = data & status_mask;
+            core.csr_file[0x100] = sstatus;
+            let mut mstatus = core.csr_file[0x300];
+            mstatus &= !status_mask;
+            mstatus |= sstatus;
+            core.csr_file[0x300] = mstatus;
+        }
+        0x104 => {
+            // sie
+            let sie = data & interrupt_mask;
+            core.csr_file[0x104] = sie;
+            let mut mie = core.csr_file[0x304];
+            mie &= !interrupt_mask;
+            mie |= sie;
+            core.csr_file[0x304] = mie;
+        }
+        0x300 => {
+            // mstatus
+            core.csr_file[0x300] = data;
+            core.csr_file[0x100] = data & status_mask;
+        }
+        0x304 => {
+            // mie
+            core.csr_file[0x304] = data;
+            core.csr_file[0x104] = data & interrupt_mask & mideleg;
+        }
+        _ => {
+            core.csr_file[addr as usize] = data;
+        }
+    }
+
     core.csr_file[addr] = data;
-    mirror(core);
 }
 
 #[allow(non_snake_case)]
@@ -131,22 +170,30 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
     //     print!("satp write: 0x{:x} 0x{:x}", addr, data);
     //     println!("\t0x{:08x}", core.pc);
     // }
-    if addr == csr_addr(Csr::mie) as u32 {
-        print!("mie write: 0b{:b}", data);
-        println!("\t0x{:08x}", core.pc);
-    }
-    if addr == csr_addr(Csr::mcountinhibit) as u32 {
-        print!("mcountinhibit write: 0b{:b}", data);
-        println!("\t0x{:08x}", core.pc);
-    }
-    if addr == csr_addr(Csr::mcounteren) as u32 {
-        print!("mcounteren write: 0b{:b}", data);
-        println!("\t0x{:08x}", core.pc);
-    }
-    if addr == csr_addr(Csr::mideleg) as u32 {
-        print!("mideleg write: 0b{:b}", data);
-        println!("\t0x{:08x}", core.pc);
-    }
+    // if addr == csr_addr(Csr::mie) as u32 {
+    //     print!("mie write: 0b{:b}", data);
+    //     println!("\t0x{:08x}", core.pc);
+    // }
+    // if addr == csr_addr(Csr::mcountinhibit) as u32 {
+    //     print!("mcountinhibit write: 0b{:b}", data);
+    //     println!("\t0x{:08x}", core.pc);
+    // }
+    // if addr == csr_addr(Csr::mcounteren) as u32 {
+    //     print!("mcounteren write: 0b{:b}", data);
+    //     println!("\t0x{:08x}", core.pc);
+    // }
+    // if addr == csr_addr(Csr::mideleg) as u32 {
+    //     print!("mideleg write: 0b{:b}", data);
+    //     println!("\t0x{:08x}", core.pc);
+    // }
+    // if addr == csr_addr(Csr::mstatus) as u32 {
+    //     print!("mstatus write: 0b{:b} 0x{:x}", data, data);
+    //     println!("\t0x{:08x}", core.pc);
+    // }
+    // if addr == csr_addr(Csr::sstatus) as u32 {
+    //     print!("sstatus write: 0b{:b} 0x{:x}", data, data);
+    //     println!("\t0x{:08x}", core.pc);
+    // }
 
     let perm = permissions(addr);
     if perm.mode > core.mode || !perm.w {
@@ -171,7 +218,7 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
             mstatus |= sstatus;
             core.csr_file[0x300] = mstatus;
             return Ok(());
-        },
+        }
         0x104 => {
             // sie
             let sie = data & interrupt_mask;
@@ -280,7 +327,6 @@ pub fn write_64(csr: Csr64, data: u64, core: &mut Core) {
 }
 
 fn mirror(core: &mut Core) {
-
     // timers
     let mcycle = core.csr_file[csr_addr(Csr::mcycle)];
     let mcycleh = core.csr_file[csr_addr(Csr::mcycleh)];

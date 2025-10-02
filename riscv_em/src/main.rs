@@ -11,8 +11,8 @@ use termion::raw::IntoRawMode;
 
 const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = true;
-const SPIKE_DEBUG: bool = true;
+const DEBUG: bool = false;
+const SPIKE_DEBUG: bool = false;
 const PRINT_START: u64 = 1e10 as u64;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Ok(x) => match x {
                 core::State::Ok => {}
                 core::State::Sleep => {
-                    println!("Sleep... 0x{:08x} < 0x{:08x}; {}", proc.mtime, proc.mtimecmp, i128::from(proc.mtimecmp) - i128::from(proc.mtime));
+                    // println!("Sleep... 0x{:08x} < 0x{:08x}; {}", proc.mtime, proc.mtimecmp, i128::from(proc.mtimecmp) - i128::from(proc.mtime));
                     // println!("mie: 0b{:b}", proc.csr_file[0x304]);
                     ctr = ctr.max(proc.mtimecmp);
                     // proc.mtime = proc.mtime.max(proc.mtimecmp);

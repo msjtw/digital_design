@@ -146,7 +146,7 @@ impl<'a> Core<'a> {
             // machine interrupts only taken when MIE is set
             if mstatus & 0b1000 != 0 {
                 if  mie & mip & 0b10000000 != 0 {
-                    println!("mmode m timer");
+                    // println!("mmode m timer");
                     self.trap = 0x80000007;
                 }
             }
@@ -154,13 +154,13 @@ impl<'a> Core<'a> {
         } else if self.mode == 1 {
             // machine interrupts are always taken
             if  mie & mip & 0b10000000 != 0 {
-                println!("smode m timer");
+                // println!("smode m timer");
                 self.trap = 0x80000007;
             }
             // supervisor interrupts only taken when SIE is set
             if mstatus & 0b10 != 0 {
                 if  mie & mip & 0b100000 != 0 {
-                    println!("smode s timer");
+                    // println!("smode s timer");
                     self.trap = 0x80000005;
                 }
             }
@@ -269,7 +269,7 @@ impl<'a> Core<'a> {
 
     fn m_mode_trap_handler(&mut self) {
         // Machine mode trap handler
-        println!("mmode trap");
+        // println!("mmode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("mmode trap");
@@ -296,7 +296,7 @@ impl<'a> Core<'a> {
         // save mie into mpie
         let mpie = (mstatus & 0b1000) << 4;
         // zero mpp and mpie fields
-        let mut mstatus = mstatus & !((0b11 << 11) | (0b1 << 7));
+        let mut mstatus = mstatus & !0b1100010000000;
         mstatus |= mpp;
         mstatus |= mpie;
         // disable interrupts
@@ -333,7 +333,7 @@ impl<'a> Core<'a> {
 
     fn s_mode_trap_handler(&mut self) {
         // Supervisor mode trap handler
-        println!("smode trap");
+        // println!("smode trap");
         if super::DEBUG {
             // print!("o {:x} ", self.trap);
             // println!("smode trap");
@@ -365,9 +365,7 @@ impl<'a> Core<'a> {
         // disable interrupts
         mstatus &= !0b10;
         csr::write(Csr::mstatus, mstatus, self);
-        println!("--0b{:b}", mstatus);
         let mstatus = csr::read(Csr::mstatus, self);
-        println!("==0b{:b}", mstatus);
 
         // save pc
         csr::write(Csr::sepc, self.pc, self);
