@@ -3,8 +3,8 @@ mod datapath;
 pub mod exceptions;
 mod instr_parse;
 
-// mod instr_debug;
-// use instr_debug::debug_instr;
+mod instr_debug;
+use instr_debug::debug_instr;
 
 use crate::memory::{self};
 use csr::{Csr, Csr64};
@@ -26,6 +26,7 @@ pub enum State {
 // #[derive(Debug)]
 pub struct Core<'a> {
     pub pc: u32,
+    prev_pc: u32,
     reg_file: [i32; 32],
     pub csr_file: [u32; 4096],
     pub memory: &'a mut memory::Memory,
@@ -46,12 +47,15 @@ pub struct Core<'a> {
     pub last_pa: u32,
     pub p_start: bool,
     pub sleep: bool,
+
+    pub timer_count: i32,
 }
 
 impl<'a> Core<'a> {
     pub fn new<'b>(memory: &'a mut memory::Memory) -> Self {
         Core {
             pc: 0,
+            prev_pc: 0,
             reg_file: [0; 32],
             csr_file: [0; 4096],
             memory,
@@ -72,6 +76,8 @@ impl<'a> Core<'a> {
             last_pa: 0,
             p_start: false,
             sleep: false,
+
+            timer_count: 0,
         }
     }
 
@@ -117,126 +123,135 @@ impl<'a> Core<'a> {
         Ok(())
     }
 
-    pub fn exec(&mut self) -> Result<State, Exception> {
-        if super::DEBUG && (self.pc == 0x80400094 || csr::read_64(Csr64::mcycle, self) > super::PRINT_START) {
-            self.p_start = true;
-        }
-
-        let mut mip = csr::read(Csr::mip, self);
-        if self.mtime >= self.mtimecmp {
-            mip |= 0b10000000;
-            self.wfi = false;
-        } else {
-            mip &= !0b10000000;
-        }
-        csr::write(Csr::mip, mip, self);
-
-        if self.wfi {
-            return Ok(State::Sleep);
-        }
-
+    pub fn exec(&mut self, max_cycles: u32) -> Result<State, Exception> {
         let mut instr_fetch = 0;
+        let mut curr_cycle = 0;
+        while curr_cycle < max_cycles && self.trap == TRAP_CLEAR {
+            curr_cycle += 1;
+            if super::DEBUG
+                && (self.pc == 0x80400094 || csr::read_64(Csr64::mcycle, self) > super::PRINT_START)
+            {
+                self.p_start = true;
+                self.mtime = 0xc9f4;
+                self.timer_count = 0;
+            }
 
-        // Global interrupt enabled
-        let mstatus = csr::read(Csr::mstatus, self);
-        let mie = csr::read(Csr::mie, self);
-        let mip = csr::read(Csr::mip, self);
-        
-        if self.mode == 3 {
-            // machine interrupts only taken when MIE is set
-            if mstatus & 0b1000 != 0 {
-                if  mie & mip & 0b10000000 != 0 {
-                    // println!("mmode m timer");
+            let mut mip = csr::read(Csr::mip, self);
+            if self.mtime >= self.mtimecmp {
+                mip |= 0b10000000;
+                self.wfi = false;
+            } else {
+                mip &= !0b10000000;
+            }
+            csr::write(Csr::mip, mip, self);
+
+            if self.wfi {
+                return Ok(State::Sleep);
+            }
+
+            // Global interrupt enabled
+            let mstatus = csr::read(Csr::mstatus, self);
+            let mie = csr::read(Csr::mie, self);
+            let mip = csr::read(Csr::mip, self);
+
+            if self.mode == 3 {
+                // machine interrupts only taken when MIE is set
+                if mstatus & 0b1000 != 0 {
+                    if mie & mip & 0b10000000 != 0 {
+                        self.trap = 0x80000007;
+                    }
+                }
+                // supervisor interrupts are never taken
+            } else if self.mode == 1 {
+                // machine interrupts are always taken
+                if mie & mip & 0b10000000 != 0 {
                     self.trap = 0x80000007;
                 }
-            }
-            // supervisor interrupts are never taken
-        } else if self.mode == 1 {
-            // machine interrupts are always taken
-            if  mie & mip & 0b10000000 != 0 {
-                // println!("smode m timer");
-                self.trap = 0x80000007;
-            }
-            // supervisor interrupts only taken when SIE is set
-            if mstatus & 0b10 != 0 {
-                if  mie & mip & 0b100000 != 0 {
-                    // println!("smode s timer");
+                // supervisor interrupts only taken when SIE is set
+                if mstatus & 0b10 != 0 {
+                    if mie & mip & 0b100000 != 0 {
+                        self.trap = 0x80000005;
+                    }
+                    if mie & mip & 0b10 != 0 {
+                        self.trap = 0x80000001;
+                    }
+                }
+            } else if self.mode == 0 {
+                // all inerrupts are always taken
+                if mie & mip & 0b10000000 != 0 {
+                    self.trap = 0x80000007;
+                }
+                if mie & mip & 0b100000 != 0 {
                     self.trap = 0x80000005;
                 }
-            }
-        } else if self.mode == 0 {
-            // all inerrupts are always taken
-            if  mie & mip & 0b10000000 != 0 {
-                self.trap = 0x80000007;
-            }
-            if  mie & mip & 0b100000 != 0 {
-                self.trap = 0x80000005;
-            }
-        }
-
-        if self.trap == TRAP_CLEAR {
-            if self.pc & 0b11 > 0 {
-                // check instruction address aligment
-                self.trap = 0;
-            } else {
-                if (csr::read(Csr::mcountinhibit, self) & 0b1) == 0 {
-                    let cycle = csr::read_64(Csr64::mcycle, self);
-                    csr::write_64(Csr64::mcycle, cycle + 1, self);
+                if mie & mip & 0b10 != 0 {
+                    self.trap = 0x80000001;
                 }
+            }
 
-                match memory::fetch_word(self.pc, self) {
-                    Ok(fetch_result) => {
-                        if super::DEBUG
-                            && (csr::read_64(Csr64::mcycle, self) > super::PRINT_START
-                                || self.p_start)
-                        {
-                            if fetch_result != 0x00000073 {
-                                print!("core   0: {} 0x{:x?} (0x{:08x?})\t", self.mode, self.pc, fetch_result);
-                                if !super::SPIKE_DEBUG {
-                                    print!("0x{:x?}: 0x{:08x?}\n", self.pc, fetch_result);
-                                }
-                            }
-                            if self.pc == 0xc02b3cf8 {
-                                // print!("--0b{:b}--0b{:b}--", self.csr_file[0x306], self.csr_file[0x106]);
-                            }
-                            // print_state(self);
-
-                            // println!("{}", debug_instr(self, fetch_result));
-                            // if self.mtime > 788381 - 5 {
-                            // print_state_gdb(self);
-                            // }
-                        }
-                        instr_fetch = fetch_result;
-                        // self.instr_str = debug_instr(self, instr_fetch);
-
-                        match Instruction::from(fetch_result) {
-                            Ok(instr) => {
-                                let ret = match instr {
-                                    Instruction::R(x) => datapath::exec_r(self, &x),
-                                    Instruction::I(x) => datapath::exec_i(self, &x),
-                                    Instruction::U(x) => datapath::exec_u(self, &x),
-                                    Instruction::J(x) => datapath::exec_j(self, &x),
-                                    Instruction::S(x) => datapath::exec_s(self, &x),
-                                    Instruction::B(x) => datapath::exec_b(self, &x),
-                                };
-                                match ret {
-                                    Ok(State::Ok) => {}
-                                    Ok(x) => return Ok(x),
-                                    Err(e) => self.trap = exception_number(e),
-                                };
-                            }
-                            Err(e) => self.trap = exception_number(e),
-                        };
+            if self.trap == TRAP_CLEAR {
+                if self.pc & 0b11 > 0 {
+                    // check instruction address aligment
+                    self.trap = 0;
+                } else {
+                    if (csr::read(Csr::mcountinhibit, self) & 0b1) == 0 {
+                        let cycle = csr::read_64(Csr64::mcycle, self);
+                        csr::write_64(Csr64::mcycle, cycle + 1, self);
+                        self.timer_count += 1;
                     }
-                    Err(e) => self.trap = exception_number(e),
-                };
+
+                    self.prev_pc = self.pc;
+
+                    match memory::fetch_word(self.pc, self) {
+                        Ok(fetch_result) => {
+                            instr_fetch = fetch_result;
+                            self.instr_str = debug_instr(self, instr_fetch);
+
+                            match Instruction::from(fetch_result) {
+                                Ok(instr) => {
+                                    let ret = match instr {
+                                        Instruction::R(x) => datapath::exec_r(self, &x),
+                                        Instruction::I(x) => datapath::exec_i(self, &x),
+                                        Instruction::U(x) => datapath::exec_u(self, &x),
+                                        Instruction::J(x) => datapath::exec_j(self, &x),
+                                        Instruction::S(x) => datapath::exec_s(self, &x),
+                                        Instruction::B(x) => datapath::exec_b(self, &x),
+                                    };
+                                    match ret {
+                                        Ok(State::Ok) => {}
+                                        Ok(x) => return Ok(x),
+                                        Err(e) => self.trap = exception_number(e),
+                                    };
+                                }
+                                Err(e) => self.trap = exception_number(e),
+                            };
+                        }
+                        Err(e) => self.trap = exception_number(e),
+                    };
+
+                    if self.p_start {
+                        if instr_fetch != 0x00000073 {
+                            print!(
+                                "core   0: {} 0x{:x?} (0x{:08x?})\t",
+                                self.mode, self.prev_pc, instr_fetch
+                            );
+                            if !super::SPIKE_DEBUG {
+                                print!("0x{:x?}: 0x{:08x?}\n", self.pc, instr_fetch);
+                            }
+                            else{
+                                println!("{}", debug_instr(self, instr_fetch));
+                            }
+                        }
+                    }
+                }
+                self.reg_file[0] = 0;
             }
         }
 
-        self.reg_file[0] = 0;
-
-        if self.trap != u32::MAX {
+        if self.trap != TRAP_CLEAR {
+            // if self.trap != 2 && self.trap != 9 && self.trap != 0x80000007 && self.trap != 0x80000005 {
             // println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            // }
             if self.trap == 2 {
                 self.trap_val = instr_fetch;
             }
@@ -281,7 +296,7 @@ impl<'a> Core<'a> {
         } else {
             // exception
             csr::write(Csr::mcause, self.trap, self);
-            if   self.trap <= 7 || (self.trap >= 12 && self.trap <= 15) {
+            if self.trap <= 7 || (self.trap >= 12 && self.trap <= 15) {
                 // breakpoint (3); address-misaligned (0, 4, 6);
                 // access-fault (1, 5, 7); page-fault(12, 13, 15)
                 csr::write(Csr::mtval, self.trap_val, self);

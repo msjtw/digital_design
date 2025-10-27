@@ -15,8 +15,8 @@ pub fn read(csr: Csr, core: &Core) -> u32 {
 
 pub fn write(csr: Csr, data: u32, core: &mut Core) {
     let addr = csr_addr(csr);
-    // if addr == csr_addr(Csr::mstatus) {
-    //     print!("mstatus write name: 0x{:x} 0b{:b}", addr, data);
+    // if addr == csr_addr(Csr::mip) {
+    //     print!("mip write: 0b{:b}", data);
     //     println!("\t0x{:08x}", core.pc);
     // }
 
@@ -165,13 +165,13 @@ pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
 }
 
 pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception> {
-    // println!("csr write: {}[0x{:x}] <- 0x{:x}", csr_name(addr), addr, data);
+    // // println!("csr write: {}[0x{:x}] <- 0x{:x}", csr_name(addr), addr, data);
     // if addr == csr_addr(Csr::satp) as u32 {
-    //     print!("satp write: 0x{:x} 0x{:x}", addr, data);
+    //     print!("satp write: 0x{:x}", data);
     //     println!("\t0x{:08x}", core.pc);
     // }
-    // if addr == csr_addr(Csr::mie) as u32 {
-    //     print!("mie write: 0b{:b}", data);
+    // if addr == csr_addr(Csr::mip) as u32 {
+    //     print!("mip write: 0b{:b}", data);
     //     println!("\t0x{:08x}", core.pc);
     // }
     // if addr == csr_addr(Csr::mcountinhibit) as u32 {

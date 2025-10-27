@@ -1,0 +1,4 @@
+set args --isa=RV32ima --log-commits -m64 --dtb ~/Documents/digital_design/riscv_em/device_tree/spike.dtb ~/Downloads/opensbi/build/platform/generic/firmware/fw_payload.elf
+break sim.cc:step
+break 0xc00077a8
+run

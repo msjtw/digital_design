@@ -124,11 +124,12 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
             if perm.w {
                 return phys_write_word(phys_addr, data, core);
             }
+            println!("mmu error 51");
             core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
-            // println!("mmu error 5");
+            println!("mmu error 5");
             match x {
                 Some(x) => return Err(x),
                 None => {
@@ -145,11 +146,12 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
             if perm.w {
                 return phys_write_hword(phys_addr, data, core);
             }
+            println!("mmu error 61");
             core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
-            // println!("mmu error 6");
+            println!("mmu error 6");
             match x {
                 Some(x) => return Err(x),
                 None => {
@@ -166,11 +168,12 @@ pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions
             if perm.w {
                 return phys_write_byte(phys_addr, data, core);
             }
+            println!("mmu error 71");
             core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
-            // println!("mmu error 7");
+            println!("mmu error 7 {:?}", x);
             match x {
                 Some(x) => return Err(x),
                 None => {
@@ -194,8 +197,14 @@ pub fn phys_read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exc
 
     if addr < memory.base_addr {
         return match addr {
-            0x200bffc => Ok((core.mtime >> 32) as u32),
-            0x200bff8 => Ok(core.mtime as u32),
+            0x200bffc => {
+                println!("mtime change 0x{:x}", core.mtime);
+                Ok((core.mtime >> 32) as u32)
+            }
+            0x200bff8 => {
+                println!("mtime change 0x{:x}", core.mtime);
+                Ok(core.mtime as u32)
+            }
             // 0x11004004 => Ok((core.mtimecmp >> 32) as u32),
             // 0x11004000 => Ok(core.mtimecmp as u32),
             _ => {

@@ -11,8 +11,8 @@ use termion::raw::IntoRawMode;
 
 const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = false;
-const SPIKE_DEBUG: bool = false;
+const DEBUG: bool = true;
+const SPIKE_DEBUG: bool = true;
 const PRINT_START: u64 = 1e10 as u64;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -39,17 +39,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         // let diff_cycle = curr_cycle - last_cycle;
         // last_cycle = curr_cycle;
 
-        ctr += 1;
-        let time_diff = SystemTime::now().duration_since(start_time).unwrap().as_millis() as u64;
-        proc.mtime = ctr as u64;
 
-        match proc.exec() {
+
+        match proc.exec(5000) {
             Ok(x) => match x {
                 core::State::Ok => {}
                 core::State::Sleep => {
                     // println!("Sleep... 0x{:08x} < 0x{:08x}; {}", proc.mtime, proc.mtimecmp, i128::from(proc.mtimecmp) - i128::from(proc.mtime));
                     // println!("mie: 0b{:b}", proc.csr_file[0x304]);
-                    ctr = ctr.max(proc.mtimecmp);
+                    // ctr = ctr.max(proc.mtimecmp);
                     // proc.mtime = proc.mtime.max(proc.mtimecmp);
                     // proc.sleep = true;
                     // let add_time = (proc.memory.csr_read(memory::Time::Mtimecmp) as i64
@@ -74,6 +72,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 break;
             }
         }
+        
+
+        ctr += 1;
+        let time_diff = SystemTime::now().duration_since(start_time).unwrap().as_millis() as u64;
+
+        // if (proc.timer_count -2 )% 5000 == 0 {
+            proc.mtime += 50;
+            if DEBUG && proc.p_start {
+                println!("mtime change 0x{:x}", proc.mtime);
+            }
+        // }
 
         // if DEBUG && ctr > 1e6 as u64 {
         //     break;
