@@ -3,9 +3,6 @@ mod datapath;
 pub mod exceptions;
 mod instr_parse;
 
-mod instr_debug;
-use instr_debug::debug_instr;
-
 use crate::memory::{self};
 use csr::{Csr, Csr64};
 use exceptions::*;
@@ -26,7 +23,6 @@ pub enum State {
 // #[derive(Debug)]
 pub struct Core<'a> {
     pub pc: u32,
-    prev_pc: u32,
     reg_file: [i32; 32],
     pub csr_file: [u32; 4096],
     pub memory: &'a mut memory::Memory,
@@ -47,15 +43,12 @@ pub struct Core<'a> {
     pub last_pa: u32,
     pub p_start: bool,
     pub sleep: bool,
-
-    pub timer_count: i32,
 }
 
 impl<'a> Core<'a> {
     pub fn new<'b>(memory: &'a mut memory::Memory) -> Self {
         Core {
             pc: 0,
-            prev_pc: 0,
             reg_file: [0; 32],
             csr_file: [0; 4096],
             memory,
@@ -76,8 +69,6 @@ impl<'a> Core<'a> {
             last_pa: 0,
             p_start: false,
             sleep: false,
-
-            timer_count: 0,
         }
     }
 
@@ -128,12 +119,12 @@ impl<'a> Core<'a> {
         let mut curr_cycle = 0;
         while curr_cycle < max_cycles && self.trap == TRAP_CLEAR {
             curr_cycle += 1;
+
             if super::DEBUG
                 && (self.pc == 0x80400094 || csr::read_64(Csr64::mcycle, self) > super::PRINT_START)
             {
                 self.p_start = true;
                 self.mtime = 0xc9f4;
-                self.timer_count = 0;
             }
 
             let mut mip = csr::read(Csr::mip, self);
@@ -197,15 +188,18 @@ impl<'a> Core<'a> {
                     if (csr::read(Csr::mcountinhibit, self) & 0b1) == 0 {
                         let cycle = csr::read_64(Csr64::mcycle, self);
                         csr::write_64(Csr64::mcycle, cycle + 1, self);
-                        self.timer_count += 1;
                     }
-
-                    self.prev_pc = self.pc;
 
                     match memory::fetch_word(self.pc, self) {
                         Ok(fetch_result) => {
                             instr_fetch = fetch_result;
-                            self.instr_str = debug_instr(self, instr_fetch);
+
+                            if self.p_start {
+                                self.instr_str = format!(
+                                    "core   0: {} 0x{:x?} (0x{:08x?})\t",
+                                    self.mode, self.pc, instr_fetch
+                                );
+                            }
 
                             match Instruction::from(fetch_result) {
                                 Ok(instr) => {
@@ -218,8 +212,7 @@ impl<'a> Core<'a> {
                                         Instruction::B(x) => datapath::exec_b(self, &x),
                                     };
                                     match ret {
-                                        Ok(State::Ok) => {}
-                                        Ok(x) => return Ok(x),
+                                        Ok(_) => {}
                                         Err(e) => self.trap = exception_number(e),
                                     };
                                 }
@@ -229,17 +222,16 @@ impl<'a> Core<'a> {
                         Err(e) => self.trap = exception_number(e),
                     };
 
-                    if self.p_start {
+                    if self.p_start && self.trap == TRAP_CLEAR {
                         if instr_fetch != 0x00000073 {
-                            print!(
-                                "core   0: {} 0x{:x?} (0x{:08x?})\t",
-                                self.mode, self.prev_pc, instr_fetch
-                            );
                             if !super::SPIKE_DEBUG {
-                                print!("0x{:x?}: 0x{:08x?}\n", self.pc, instr_fetch);
-                            }
-                            else{
-                                println!("{}", debug_instr(self, instr_fetch));
+                                print!(
+                                    "core   0: {} 0x{:x?} (0x{:08x?})\t",
+                                    self.mode, self.pc, instr_fetch
+                                );
+                                eprintln!("0x{:x?}: 0x{:08x?}", self.pc, instr_fetch);
+                            } else {
+                                eprintln!("{}", self.instr_str);
                             }
                         }
                     }

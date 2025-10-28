@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let start_time = SystemTime::now();
 
-    let mut ctr = 0;
+    // let mut ctr = 0;
     loop {
         // let curr_cycle =
         //     ((*proc.csr(core::Csr::Cycleh) as u64) << 32) + (*proc.csr(core::Csr::Cycle) as u64);
@@ -68,21 +68,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             },
             Err(x) => {
-                println!("err: {:?}", x);
+                eprintln!("err: {:?}", x);
                 break;
             }
         }
         
 
-        ctr += 1;
+        // ctr += 1;
         let time_diff = SystemTime::now().duration_since(start_time).unwrap().as_millis() as u64;
 
-        // if (proc.timer_count -2 )% 5000 == 0 {
-            proc.mtime += 50;
-            if DEBUG && proc.p_start {
-                println!("mtime change 0x{:x}", proc.mtime);
-            }
-        // }
+        proc.mtime += 50;
+        if proc.p_start {
+            eprintln!("mtime change 0x{:x}", proc.mtime);
+        }
 
         // if DEBUG && ctr > 1e6 as u64 {
         //     break;

@@ -35,6 +35,10 @@ pub struct MemoryPermissions {
 }
 
 pub fn read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
+    if addr & 0b11 > 0 {
+        core.trap_val = addr;
+        return Err(exceptions::Exception::Load_address_misaligned);
+    }
     match sv32::translate(addr, core, AccessType::R) {
         Ok((phys_addr, perm)) => {
             if perm.r {
@@ -77,6 +81,10 @@ pub fn fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Excepti
     };
 }
 pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Exception> {
+    if addr & 0b1 > 0 {
+        core.trap_val = addr;
+        return Err(exceptions::Exception::Load_address_misaligned);
+    }
     match sv32::translate(addr, core, AccessType::R) {
         Ok((phys_addr, perm)) => {
             if perm.r {
@@ -119,6 +127,10 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
     };
 }
 pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
+    if addr & 0b11 > 0 {
+        core.trap_val = addr;
+        return Err(exceptions::Exception::StoreAMO_address_misaligned);
+    }
     match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
@@ -141,6 +153,10 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
     };
 }
 pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptions::Exception> {
+    if addr & 0b1 > 0 {
+        core.trap_val = addr;
+        return Err(exceptions::Exception::StoreAMO_address_misaligned);
+    }
     match sv32::translate(addr, core, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
@@ -198,11 +214,15 @@ pub fn phys_read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exc
     if addr < memory.base_addr {
         return match addr {
             0x200bffc => {
-                println!("mtime change 0x{:x}", core.mtime);
+                if core.p_start{
+                    eprintln!("mtime change 0x{:x}", core.mtime);
+                }
                 Ok((core.mtime >> 32) as u32)
             }
             0x200bff8 => {
-                println!("mtime change 0x{:x}", core.mtime);
+                if core.p_start{
+                    eprintln!("mtime change 0x{:x}", core.mtime);
+                }
                 Ok(core.mtime as u32)
             }
             // 0x11004004 => Ok((core.mtimecmp >> 32) as u32),
@@ -337,10 +357,16 @@ pub fn phys_write_word(
             //     core.mtime = ((mtimeh as u64) << 32) + data as u64;
             // }
             0x2004004 => {
+                if core.p_start{
+                    eprintln!("mtime change 0x{:x}", core.mtime);
+                }
                 let mtimecmpl = core.mtimecmp as u32;
                 core.mtimecmp = ((data as u64) << 32) + mtimecmpl as u64;
             }
             0x2004000 => {
+                if core.p_start{
+                    eprintln!("mtime change 0x{:x}", core.mtime);
+                }
                 let mtimecmph = (core.mtimecmp >> 32) as u32;
                 core.mtimecmp = ((mtimecmph as u64) << 32) + data as u64;
             }
@@ -400,10 +426,8 @@ pub fn phys_write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), excep
     if addr < memory.base_addr {
         match addr {
             0x10000000 => {
-                if !super::DEBUG {
-                    print!("{}", data as char);
-                    let _ = std::io::stdout().flush();
-                }
+                print!("{}", data as char);
+                let _ = std::io::stdout().flush();
             } // TODO: UART;
             0x11100000 => {} // TODO: SYSCON;
             _ => {
