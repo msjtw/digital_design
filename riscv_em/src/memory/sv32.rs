@@ -5,7 +5,7 @@ use crate::{
     memory,
 };
 
-use super::{phys_read_word, phys_write_word, MemoryPermissions};
+use super::{MemoryPermissions, phys_read_word, phys_write_word};
 
 const PAGESIZE: u32 = 1 << 12;
 const LEVELS: u32 = 2;
@@ -33,35 +33,34 @@ struct PTE {
 impl From<u32> for PTE {
     fn from(pte: u32) -> Self {
         PTE {
-            ppn:  (pte & 0b11111111111111111111110000000000) >> 10,
+            ppn: (pte & 0b11111111111111111111110000000000) >> 10,
             ppn1: (pte & 0b11111111111100000000000000000000) >> 20,
             ppn0: (pte & 0b00000000000011111111110000000000) >> 10,
             rsw: ((pte & 0b00000000000000000000001100000000) >> 8) as u8,
-            d:    (pte & 0b00000000000000000000000010000000) >= 1,
-            a:    (pte & 0b00000000000000000000000001000000) >= 1,
-            g:    (pte & 0b00000000000000000000000000100000) >= 1,
-            u:    (pte & 0b00000000000000000000000000010000) >= 1,
-            x:    (pte & 0b00000000000000000000000000001000) >= 1,
-            w:    (pte & 0b00000000000000000000000000000100) >= 1,
-            r:    (pte & 0b00000000000000000000000000000010) >= 1,
-            v:    (pte & 0b00000000000000000000000000000001) >= 1,
+            d: (pte & 0b00000000000000000000000010000000) >= 1,
+            a: (pte & 0b00000000000000000000000001000000) >= 1,
+            g: (pte & 0b00000000000000000000000000100000) >= 1,
+            u: (pte & 0b00000000000000000000000000010000) >= 1,
+            x: (pte & 0b00000000000000000000000000001000) >= 1,
+            w: (pte & 0b00000000000000000000000000000100) >= 1,
+            r: (pte & 0b00000000000000000000000000000010) >= 1,
+            v: (pte & 0b00000000000000000000000000000001) >= 1,
         }
     }
 }
 
 impl Into<u32> for PTE {
     fn into(self) -> u32 {
-        let res = 
-        (self.ppn as u32) << 10 | 
-        (self.rsw as u32) << 8 |
-        (self.d as u32) << 7 |
-        (self.a as u32) << 6 |
-        (self.g as u32) << 5 |
-        (self.u as u32) << 4 |
-        (self.x as u32) << 3 |
-        (self.w as u32) << 2 |
-        (self.r as u32) << 1 |
-        (self.v as u32);
+        let res = (self.ppn as u32) << 10
+            | (self.rsw as u32) << 8
+            | (self.d as u32) << 7
+            | (self.a as u32) << 6
+            | (self.g as u32) << 5
+            | (self.u as u32) << 4
+            | (self.x as u32) << 3
+            | (self.w as u32) << 2
+            | (self.r as u32) << 1
+            | (self.v as u32);
         res
     }
 }
@@ -151,7 +150,7 @@ impl Into<u32> for PA {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum AccessType {
     R,
     W,
@@ -167,7 +166,18 @@ pub fn translate(
     let satp = SATP::from(satp);
 
     // The satp register must be active, i.e., the effective privilege mode must be S-mode or U-mode.
-    if satp.mode == 0 || core.mode > 1 {
+    // The MPRV (Modify PRiVilege) bit modifies the effective privilege mode.
+    // When MPRV=0, loads and stores behave as of the current privilege mode.
+    // When MPRV=1, loads and stores behave as though the current privilege mode were set to MPP
+    let mstatus = csr::read(csr::Csr::mstatus, core);
+    let mprv = (mstatus >> 17) & 0b1;
+    let mode;
+    if a_type != AccessType::X && mprv > 0 {
+        mode = (mstatus >> 11) & 0b11;
+    } else {
+        mode = core.mode;
+    }
+    if satp.mode == 0 || mode > 1 {
         return Ok((
             virt_a,
             MemoryPermissions {
@@ -278,18 +288,17 @@ pub fn translate(
     //     print!("superpage  ");
     // }
 
-    let mstatus = csr::read(csr::Csr::mstatus, core);
-    let mstatus_sum = mstatus & 1 << 18;
-    let mstatus_mxr = mstatus & 1 << 19;
-    if !pte.u && core.mode != 1 {
+    let mstatus_sum = mstatus & (1 << 18);
+    let mstatus_mxr = mstatus & (1 << 19);
+    if !pte.u && mode != 1 {
         // access supervisor page not from S-mode
         println!("page fault 4");
         return Err(None);
     }
-    if pte.u && core.mode != 0 {
+    if pte.u && mode != 0 {
         // access user page not from U-mode
         // check for SUM of mstatus
-        if !(core.mode == 1) || !(mstatus_sum > 0) {
+        if !(mode == 1) || !(mstatus_sum > 0) {
             println!("page fault 5");
             return Err(None);
         }
@@ -312,9 +321,6 @@ pub fn translate(
     //     );
     // }
 
-
-
-
     let res: (u32, MemoryPermissions);
     if mstatus_mxr > 0 {
         // make eXecutable Readable
@@ -326,8 +332,7 @@ pub fn translate(
                 x: pte.x,
             },
         );
-    }
-    else {
+    } else {
         res = (
             phys_a,
             MemoryPermissions {
@@ -341,12 +346,12 @@ pub fn translate(
     let mut pte = pte.set_a();
     match a_type {
         AccessType::W => pte = pte.set_d(),
-        _ => {},
+        _ => {}
     }
     let pte_u32: u32 = pte.into();
 
     phys_write_word(pte_addr, pte_u32, core)?;
-    
+
     core.last_pa = phys_a;
 
     return Ok(res);

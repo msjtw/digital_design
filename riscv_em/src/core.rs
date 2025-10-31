@@ -32,8 +32,8 @@ pub struct Core<'a> {
 
     trap: u32,
     pub trap_val: u32,
-    lr_address: u32,
-    lr_valid: bool,
+    pub lr_address: u32,
+    lr_set: i32,
     pub mode: u32,
     wfi: bool, // wait for interrupt
 
@@ -59,7 +59,7 @@ impl<'a> Core<'a> {
             trap: TRAP_CLEAR,
             trap_val: 0,
             lr_address: 0,
-            lr_valid: false,
+            lr_set: 0,
             mode: 0,
             wfi: false,
 
@@ -242,7 +242,8 @@ impl<'a> Core<'a> {
 
         if self.trap != TRAP_CLEAR {
             // if self.trap != 2 && self.trap != 9 && self.trap != 0x80000007 && self.trap != 0x80000005 {
-            // println!("it's a trap 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap, self.mode, self.pc, instr_fetch);
+            // println!("it's a trap 0x{:x} trap_val 0x{:x}; mtime 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap,
+            //    self.trap_val, self.mtime, self.mode, self.pc, instr_fetch);
             // }
             if self.trap == 2 {
                 self.trap_val = instr_fetch;

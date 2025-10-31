@@ -78,6 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let time_diff = SystemTime::now().duration_since(start_time).unwrap().as_millis() as u64;
 
         proc.mtime += 50;
+        proc.lr_address = 0x0;
         if proc.p_start {
             eprintln!("mtime change 0x{:x}", proc.mtime);
         }

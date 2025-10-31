@@ -94,7 +94,7 @@ pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Excepti
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
-            // println!("mmu error 3");
+            println!("mmu error 3");
             match x {
                 Some(x) => return Err(x),
                 None => {

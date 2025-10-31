@@ -187,13 +187,13 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
                 0b00010 => {
                     core.reg_file[instr.rd as usize] = rd;
                     core.lr_address = addr;
-                    core.lr_valid = true;
+                    core.lr_set = rd;
                     write = false;
                     write_val = 0;
                 }
                 // SC.W
                 0b00011 => {
-                    if core.lr_valid && (core.lr_address == addr) {
+                    if (core.lr_set == rd) && (core.lr_address == addr) {
                         write_val = rs2;
                         core.reg_file[instr.rd as usize] = 0;
                     } else {
@@ -201,7 +201,7 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
                         write = false;
                         write_val = 0;
                     }
-                    core.lr_valid = false;
+                    core.lr_address = 0x0;
                     // if core.p_start {
                     //     core.instr_str = format!(
                     //         "{} x{} 0x{:08x} mem 0x{:08x} 0x{:08x}",
