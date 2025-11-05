@@ -4,16 +4,15 @@ use std::env;
 use std::error::Error;
 use std::process;
 
-use std::thread::sleep;
 use std::time::SystemTime;
 use termion::raw::IntoRawMode;
-
 
 const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
 const DEBUG: bool = false;
 const SPIKE_DEBUG: bool = false;
 const PRINT_START: u64 = 1e10 as u64;
+const REAL_TIME: bool = false;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -30,17 +29,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "/home/msjtw/Documents/digital_design/riscv_em/device_tree/sixtyfourmb_spike.dtb",
     )?;
 
-    let start_time = SystemTime::now();
+    let mut last_time = SystemTime::now();
 
-    // let mut ctr = 0;
     loop {
-        // let curr_cycle =
-        //     ((*proc.csr(core::Csr::Cycleh) as u64) << 32) + (*proc.csr(core::Csr::Cycle) as u64);
-        // let diff_cycle = curr_cycle - last_cycle;
-        // last_cycle = curr_cycle;
-
-
-
         match proc.exec(5000) {
             Ok(x) => match x {
                 core::State::Ok => {}
@@ -48,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // println!("Sleep... 0x{:08x} < 0x{:08x}; {}", proc.mtime, proc.mtimecmp, i128::from(proc.mtimecmp) - i128::from(proc.mtime));
                     // println!("mie: 0b{:b}", proc.csr_file[0x304]);
                     // ctr = ctr.max(proc.mtimecmp);
-                    // proc.mtime = proc.mtime.max(proc.mtimecmp);
+                    proc.mtime = proc.mtime.max(proc.mtimecmp);
                     // proc.sleep = true;
                     // let add_time = (proc.memory.csr_read(memory::Time::Mtimecmp) as i64
                     //     - proc.memory.csr_read(memory::Time::Mtime) as i64)
@@ -72,20 +63,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 break;
             }
         }
-        
 
-        // ctr += 1;
-        let time_diff = SystemTime::now().duration_since(start_time).unwrap().as_millis() as u64;
+        if REAL_TIME {
+            let time_diff = SystemTime::now()
+                .duration_since(last_time)
+                .unwrap()
+                .as_millis() as u64;
+            last_time = SystemTime::now();
+            proc.mtime += time_diff;
+        } else {
+            proc.mtime += 50;
+        }
 
-        proc.mtime += 50;
         proc.lr_address = 0x0;
         if proc.p_start {
             eprintln!("mtime change 0x{:x}", proc.mtime);
         }
-
-        // if DEBUG && ctr > 1e6 as u64 {
-        //     break;
-        // }
     }
 
     Ok(())

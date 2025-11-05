@@ -74,7 +74,7 @@ pub fn read_pmpXcfg(n: u32, core: &Core) -> u8 {
     val as u8
 }
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, dead_code)]
 pub fn write_pmpXcfg(n: u32, data: u8, core: &mut Core) {
     let addr = match n / 4 {
         0 => csr_addr(Csr::pmpcfg0),

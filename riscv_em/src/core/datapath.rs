@@ -422,7 +422,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
             match instr.funct3 {
                 // csrrw
                 0b001 => {
-                    let mut csr = 0;
+                    let csr;
                     if instr.rd != 0 {
                         csr = csr::read_addr(csr_addr, core)?;
                         core.reg_file[instr.rd as usize] = csr as i32;

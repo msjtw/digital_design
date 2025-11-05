@@ -37,12 +37,8 @@ pub struct Core<'a> {
     pub mode: u32,
     wfi: bool, // wait for interrupt
 
-    pub dtb: Vec<u8>,
-
     pub instr_str: String,
-    pub last_pa: u32,
     pub p_start: bool,
-    pub sleep: bool,
 }
 
 impl<'a> Core<'a> {
@@ -63,12 +59,8 @@ impl<'a> Core<'a> {
             mode: 0,
             wfi: false,
 
-            dtb: vec![],
-
             instr_str: String::new(),
-            last_pa: 0,
             p_start: false,
-            sleep: false,
         }
     }
 
@@ -89,15 +81,14 @@ impl<'a> Core<'a> {
         let mut dtb_addr = super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32;
         dtb_addr >>= 3;
         dtb_addr <<= 3;
-        dtb_addr = 0x00001020;
         let data = fs::read(dtb)?;
         for i in 0..data.len() {
-            // let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
-            self.dtb.push(data[i]);
+            let _ = memory::write_byte(dtb_addr + i as u32, data[i], self);
+            // self.dtb.push(data[i]);
         }
-        while self.dtb.len() % 4 != 0 {
-            self.dtb.push(0);
-        }
+        // while self.dtb.len() % 4 != 0 {
+        //     self.dtb.push(0);
+        // }
 
         self.pc = 0x80000000;
         self.reg_file[5] = 0x00001000u32 as i32;
@@ -386,7 +377,6 @@ impl<'a> Core<'a> {
         // disable interrupts
         mstatus &= !0b10;
         csr::write(Csr::mstatus, mstatus, self);
-        let mstatus = csr::read(Csr::mstatus, self);
 
         // save pc
         csr::write(Csr::sepc, self.pc, self);
@@ -413,77 +403,5 @@ impl<'a> Core<'a> {
         self.trap = TRAP_CLEAR;
     }
 }
-pub fn print_state(core: &Core) {
-    println!(
-        "Z:{:08x} ra:{:08x} sp:{:08x} gp:{:08x} tp:{:08x} t0:{:08x} t1:{:08x} t2:{:08x} s0:{:08x} s1:{:08x} a0:{:08x} a1:{:08x} a2:{:08x} a3:{:08x} a4:{:08x} a5:{:08x} a6:{:08x} a7:{:08x} s2:{:08x} s3:{:08x} s4:{:08x} s5:{:08x} s6:{:08x} s7:{:08x} s8:{:08x} s9:{:08x} s10:{:08x} s11:{:08x} t3:{:08x} t4:{:08x} t5:{:08x} t6:{:08x}",
-        core.reg_file[0] as u32,
-        core.reg_file[1] as u32,
-        core.reg_file[2] as u32,
-        core.reg_file[3] as u32,
-        core.reg_file[4] as u32,
-        core.reg_file[5] as u32,
-        core.reg_file[6] as u32,
-        core.reg_file[7] as u32,
-        core.reg_file[8] as u32,
-        core.reg_file[9] as u32,
-        core.reg_file[10] as u32,
-        core.reg_file[11] as u32,
-        core.reg_file[12] as u32,
-        core.reg_file[13] as u32,
-        core.reg_file[14] as u32,
-        core.reg_file[15] as u32,
-        core.reg_file[16] as u32,
-        core.reg_file[17] as u32,
-        core.reg_file[18] as u32,
-        core.reg_file[19] as u32,
-        core.reg_file[20] as u32,
-        core.reg_file[21] as u32,
-        core.reg_file[22] as u32,
-        core.reg_file[23] as u32,
-        core.reg_file[24] as u32,
-        core.reg_file[25] as u32,
-        core.reg_file[26] as u32,
-        core.reg_file[27] as u32,
-        core.reg_file[28] as u32,
-        core.reg_file[29] as u32,
-        core.reg_file[30] as u32,
-        core.reg_file[31] as u32,
-    );
-}
-pub fn print_state_gdb(core: &Core) {
-    println!(
-        "ra: 0x{:x}\nsp: 0x{:x}\ngp: 0x{:x}\ntp: 0x{:x}\nt0: 0x{:x}\nt1: 0x{:x}\nt2: 0x{:x}\nfp: 0x{:x}\ns1: 0x{:x}\na0: 0x{:x}\na1: 0x{:x}\na2: 0x{:x}\na3: 0x{:x}\na4: 0x{:x}\na5: 0x{:x}\na6: 0x{:x}\na7: 0x{:x}\ns2: 0x{:x}\ns3: 0x{:x}\ns4: 0x{:x}\ns5: 0x{:x}\ns6: 0x{:x}\ns7: 0x{:x}\ns8: 0x{:x}\ns9: 0x{:x}\ns10: 0x{:x}\ns11: 0x{:x}\nt3: 0x{:x}\nt4: 0x{:x}\nt5: 0x{:x}\nt6: 0x{:x}\npc: 0x{:x}",
-        core.reg_file[1] as u32,
-        core.reg_file[2] as u32,
-        core.reg_file[3] as u32,
-        core.reg_file[4] as u32,
-        core.reg_file[5] as u32,
-        core.reg_file[6] as u32,
-        core.reg_file[7] as u32,
-        core.reg_file[8] as u32,
-        core.reg_file[9] as u32,
-        core.reg_file[10] as u32,
-        core.reg_file[11] as u32,
-        core.reg_file[12] as u32,
-        core.reg_file[13] as u32,
-        core.reg_file[14] as u32,
-        core.reg_file[15] as u32,
-        core.reg_file[16] as u32,
-        core.reg_file[17] as u32,
-        core.reg_file[18] as u32,
-        core.reg_file[19] as u32,
-        core.reg_file[20] as u32,
-        core.reg_file[21] as u32,
-        core.reg_file[22] as u32,
-        core.reg_file[23] as u32,
-        core.reg_file[24] as u32,
-        core.reg_file[25] as u32,
-        core.reg_file[26] as u32,
-        core.reg_file[27] as u32,
-        core.reg_file[28] as u32,
-        core.reg_file[29] as u32,
-        core.reg_file[30] as u32,
-        core.reg_file[31] as u32,
-        core.pc,
-    );
-}
+
+

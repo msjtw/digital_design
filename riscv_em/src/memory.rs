@@ -2,8 +2,7 @@ mod pmp;
 mod sv32;
 
 use crate::core::{Core, exceptions};
-use std::io::Write;
-use std::io::{Bytes, Read};
+use std::io::{Bytes, Read, Write};
 use sv32::AccessType;
 use termion::async_stdin;
 
@@ -214,13 +213,13 @@ pub fn phys_read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exc
     if addr < memory.base_addr {
         return match addr {
             0x200bffc => {
-                if core.p_start{
+                if core.p_start {
                     eprintln!("mtime change 0x{:x}", core.mtime);
                 }
                 Ok((core.mtime >> 32) as u32)
             }
             0x200bff8 => {
-                if core.p_start{
+                if core.p_start {
                     eprintln!("mtime change 0x{:x}", core.mtime);
                 }
                 Ok(core.mtime as u32)
@@ -228,13 +227,13 @@ pub fn phys_read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exc
             // 0x11004004 => Ok((core.mtimecmp >> 32) as u32),
             // 0x11004000 => Ok(core.mtimecmp as u32),
             _ => {
-                if addr >= 0x00001020 && addr - 0x00001020 < core.dtb.len() as u32 {
-                    let d = core.dtb[addr as usize - 0x00001020usize] as u32;
-                    let c = core.dtb[addr as usize - 0x0000101fusize] as u32;
-                    let b = core.dtb[addr as usize - 0x0000101eusize] as u32;
-                    let a = core.dtb[addr as usize - 0x0000101dusize] as u32;
-                    return Ok((a << 24) + (b << 16) + (c << 8) + d);
-                }
+                // if addr >= 0x00001020 && addr - 0x00001020 < core.dtb.len() as u32 {
+                //     let d = core.dtb[addr as usize - 0x00001020usize] as u32;
+                //     let c = core.dtb[addr as usize - 0x0000101fusize] as u32;
+                //     let b = core.dtb[addr as usize - 0x0000101eusize] as u32;
+                //     let a = core.dtb[addr as usize - 0x0000101dusize] as u32;
+                //     return Ok((a << 24) + (b << 16) + (c << 8) + d);
+                // }
                 Ok(0)
             }
         };
@@ -301,6 +300,13 @@ pub fn phys_read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exce
             0x10000005 => {
                 let mut bytes_to_read = 0;
                 if let Some(Ok(byte)) = memory.stdin.next() {
+                    if byte == 1 {
+                        let mut next_byte: [u8; 1] = [0];
+                        std::io::stdin().read_exact(&mut next_byte).unwrap();
+                        if next_byte[0] == 3 {
+                            std::process::exit(1);
+                        }
+                    }
                     memory.read_byte = byte;
                     bytes_to_read = 1;
                 }
@@ -309,9 +315,9 @@ pub fn phys_read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exce
             }
             _ => {
                 // println!("8 Error! read:0x{:x}", addr);
-                if addr >= 0x00001020 && addr - 0x00001020 < core.dtb.len() as u32 {
-                    return Ok(core.dtb[addr as usize - 0x00001020usize]);
-                }
+                // if addr >= 0x00001020 && addr - 0x00001020 < core.dtb.len() as u32 {
+                //     return Ok(core.dtb[addr as usize - 0x00001020usize]);
+                // }
                 Ok(0)
             }
         };
@@ -349,14 +355,14 @@ pub fn phys_write_word(
             //     core.mtime = ((mtimeh as u64) << 32) + data as u64;
             // }
             0x2004004 => {
-                if core.p_start{
+                if core.p_start {
                     eprintln!("mtime change 0x{:x}", core.mtime);
                 }
                 let mtimecmpl = core.mtimecmp as u32;
                 core.mtimecmp = ((data as u64) << 32) + mtimecmpl as u64;
             }
             0x2004000 => {
-                if core.p_start{
+                if core.p_start {
                     eprintln!("mtime change 0x{:x}", core.mtime);
                 }
                 let mtimecmph = (core.mtimecmp >> 32) as u32;

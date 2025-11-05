@@ -1,17 +1,10 @@
-use std::process;
+use crate::core::{Core, csr, exceptions};
 
-use crate::{
-    core::{Core, csr, exceptions},
-    memory,
-};
-
-use super::{MemoryPermissions, phys_read_word, phys_write_word};
+use super::{MemoryPermissions, phys_read_word};
 
 const PAGESIZE: u32 = 1 << 12;
 const LEVELS: u32 = 2;
 const PTESIZE: u32 = 4;
-
-const MMU_DEBUG: bool = false;
 
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone)]
@@ -65,6 +58,7 @@ impl Into<u32> for PTE {
     }
 }
 
+#[allow(dead_code)]
 impl PTE {
     fn set_a(self) -> Self {
         Self {
@@ -286,7 +280,7 @@ pub fn translate(
     }
 
     // Svade extension
-    if !pte.a || (a_type == AccessType::W && !pte.d){
+    if !pte.a || (a_type == AccessType::W && !pte.d) {
         return Err(None);
     }
 
@@ -298,14 +292,6 @@ pub fn translate(
     // let pte_u32: u32 = pte.into();
     //
     // phys_write_word(pte_addr, pte_u32, core)?;
-
-    core.last_pa = phys_a;
-
-    if virt_a == 0x9d2526fc {
-        // core.instr_str = format!("pte0>{:?}< {}", pte, core.instr_str);
-        // print!("0x{:08x} -> 0x{:08x}", virt_a, res.0);
-        // println!("\t pte {:?}", pte);riscv pma
-    }
 
     return Ok(res);
 }

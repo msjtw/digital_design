@@ -681,316 +681,54 @@ fn debug_j(core: &Core, instr: &JType) -> String {
 
 pub fn debug_instr(core: &mut Core, byte_code: u32) -> String {
     let instr = Instruction::from(byte_code);
-    if SPIKE_DEBUG {
-        match instr {
-            Ok(x) => match x {
-                Instruction::R(x) => spike_debug_r(core, &x),
-                Instruction::I(x) => spike_debug_i(core, &x),
-                Instruction::U(x) => spike_debug_u(core, &x),
-                Instruction::J(x) => spike_debug_j(core, &x),
-                Instruction::S(x) => spike_debug_s(core, &x),
-                Instruction::B(x) => spike_debug_b(core, &x),
-            },
-            Err(_) => String::from("parse error"),
-        }
-    } else {
-        match instr {
-            Ok(x) => match x {
-                Instruction::R(x) => debug_r(core, &x),
-                Instruction::I(x) => debug_i(core, &x),
-                Instruction::U(x) => debug_u(core, &x),
-                Instruction::J(x) => debug_j(core, &x),
-                Instruction::S(x) => debug_s(core, &x),
-                Instruction::B(x) => debug_b(core, &x),
-            },
-            Err(_) => String::from("parse error"),
-        }
+
+    match instr {
+        Ok(x) => match x {
+            Instruction::R(x) => debug_r(core, &x),
+            Instruction::I(x) => debug_i(core, &x),
+            Instruction::U(x) => debug_u(core, &x),
+            Instruction::J(x) => debug_j(core, &x),
+            Instruction::S(x) => debug_s(core, &x),
+            Instruction::B(x) => debug_b(core, &x),
+        },
+        Err(_) => String::from("parse error"),
     }
 }
 
-pub fn spike_debug_r(core: &mut Core, instr: &RType) -> String {
-    return match instr.opcode {
-        0b0110011 => {
-            format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
-        }
-        0b0101111 => {
-            let mut write = true;
-            let addr = core.reg_file[instr.rs1 as usize] as u32;
-            let val;
-            match memory::read_word(addr, core) {
-                Ok(x) => val = x as i32,
-                Err(x) => {
-                    return format!("");
-                }
-            };
-            let mut res = format!("");
-            match instr.funct5 {
-                // SC.W
-                0b00011 => {
-                    return format!(
-                        "{res} x{} 0x{:08x} mem 0x{:08x} 0x{:08x}",
-                        instr.rd, core.reg_file[instr.rd as usize], addr, val
-                    );
-                }
-                _ => {}
-            }
-            if instr.funct5 != 0b00011 {
-                if instr.rd == 0 {
-                    res = format!("{res} mem 0x{:08x}", addr,);
-                } else {
-                    res = format!(
-                        "{res} x{} 0x{:08x} mem 0x{:08x} ",
-                        instr.rd, core.reg_file[instr.rd as usize], addr,
-                    );
-                }
-                if write {
-                    res = format!("{res} mem 0x{:08x} 0x{:08x}", addr, val);
-                }
-            }
-            res
-        }
-        _ => return format!(""),
-    };
-}
-
-pub fn spike_debug_i(core: &Core, instr: &IType) -> String {
-    match instr.opcode {
-        0b0010011 => {
-            return if instr.rd != 0 {
-                format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
-            } else {
-                format!("")
-            };
-        }
-        0b0000011 => {
-            let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
-            return format!(
-                "x{} 0x{:08x} mem 0x{:08x}",
-                instr.rd, core.reg_file[instr.rd as usize], addr
-            );
-        }
-        //jalr
-        0b1100111 => {
-            if instr.rd != 0 {
-                return format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
-            } else {
-                return format!("");
-            }
-        }
-        0b1110011 => {
-            let csr_addr = (instr.imm & 0xfff) as u32;
-            let source = core.reg_file[instr.rs1 as usize] as u32;
-            return match instr.funct3 {
-                // csrrw
-                0b001 => {
-                    let mut res = format!("");
-                    if instr.rd != 0 {
-                        res = format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
-                    }
-                    if csr_addr == 0x100 {
-                        res = format!(
-                            "{res} c768_mstatus 0x{:08x}",
-                            csr::read(csr::Csr::mstatus, core)
-                        )
-                    } else {
-                        res = format!(
-                            "{res} c{}_{} 0x{:08x}",
-                            csr_addr,
-                            csr_name(csr_addr),
-                            source
-                        )
-                    }
-                    res
-                }
-                // csrrs
-                0b010 => {
-                    let csr;
-                    match csr::read_addr(csr_addr, core) {
-                        Ok(x) => csr = x,
-                        Err(e) => {
-                            return format!("");
-                        }
-                    };
-                    let mut res = format!("");
-                    if instr.rd != 0 {
-                        res = format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
-                    }
-                    if instr.rs1 != 0 {
-                        if csr_addr == 0x100 {
-                            res = format!(
-                                "{res} c768_mstatus 0x{:08x}",
-                                csr::read(csr::Csr::mstatus, core)
-                            )
-                        } else {
-                            res =
-                                format!("{res} c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), csr)
-                        }
-                    }
-                    res
-                }
-                // csrrc
-                0b011 => {
-                    let csr;
-                    match csr::read_addr(csr_addr, core) {
-                        Ok(x) => csr = x,
-                        Err(e) => {
-                            return format!("");
-                        }
-                    };
-                    let mut res = format!("");
-                    if instr.rd != 0 {
-                        res = format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
-                    }
-                    if instr.rs1 != 0 {
-                        if csr_addr == 0x100 {
-                            res = format!(
-                                "{res} c768_mstatus 0x{:08x}",
-                                csr::read(csr::Csr::mstatus, core)
-                            )
-                        } else {
-                            res =
-                                format!("{res} c{}_{} 0x{:08x}", csr_addr, csr_name(csr_addr), csr)
-                        }
-                    }
-                    res
-                }
-                // csrrwi
-                0b101 => {
-                    let csr;
-                    match csr::read_addr(csr_addr, core) {
-                        Ok(x) => csr = x,
-                        Err(e) => {
-                            return format!("");
-                        }
-                    };
-
-                    let mut res = format!("");
-                    if instr.rd != 0 {
-                        res = format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
-                    }
-                    if csr_addr == 0x100 {
-                        res = format!(
-                            "{res} c768_mstatus 0x{:08x}",
-                            csr::read(csr::Csr::mstatus, core)
-                        )
-                    } else {
-                        res = format!(
-                            "{res} c{}_{} 0x{:08x}",
-                            csr_addr,
-                            csr_name(csr_addr),
-                            instr.rs1
-                        )
-                    }
-                    res
-                }
-                // csrrsi
-                0b110 => {
-                    let csr;
-                    match csr::read_addr(csr_addr, core) {
-                        Ok(x) => csr = x,
-                        Err(e) => {
-                            return format!("");
-                        }
-                    };
-                    let mut res = format!("");
-                    if instr.rd != 0 {
-                        res = format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
-                    }
-                    if instr.rs1 != 0 {
-                        if csr_addr == 0x100 {
-                            res = format!(
-                                "{res} c768_mstatus 0x{:08x}",
-                                csr::read(csr::Csr::mstatus, core)
-                            )
-                        } else {
-                            res = format!(
-                                "{res} c{}_{} 0x{:08x}",
-                                csr_addr,
-                                csr_name(csr_addr),
-                                csr | instr.rs1
-                            )
-                        }
-                    }
-                    res
-                }
-                // csrrci
-                0b111 => {
-                    let csr;
-                    match csr::read_addr(csr_addr, core) {
-                        Ok(x) => csr = x,
-                        Err(e) => {
-                            return format!("");
-                        }
-                    };
-                    let mut res = format!("");
-                    if instr.rd != 0 {
-                        res = format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
-                    }
-                    if instr.rs1 != 0 {
-                        if csr_addr == 0x100 {
-                            res = format!(
-                                "{res} c768_mstatus 0x{:08x}",
-                                csr::read(csr::Csr::mstatus, core)
-                            )
-                        } else {
-                            res = format!(
-                                "{res} c{}_{} 0x{:08x}",
-                                csr_addr,
-                                csr_name(csr_addr),
-                                csr & !instr.rs1
-                            )
-                        }
-                    }
-                    res
-                }
-                0b0 => {
-                    let res;
-                    res = match instr.imm {
-                        // mret
-                        0b001100000010 => {
-                            format!(
-                                " c768_mstatus 0x{:08x} c784_mstatush 0x{:08x}",
-                                csr::read(csr::Csr::mstatus, core),
-                                csr::read(csr::Csr::mstatush, core)
-                            )
-                        }
-                        _ => format!(""),
-                    };
-                    res
-                }
-                _ => return format!(""),
-            };
-        }
-        _ => return format!(""),
-    }
-}
-
-pub fn spike_debug_s(core: &Core, instr: &SType) -> String {
-    let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
-    let rs2 = core.reg_file[instr.rs2 as usize];
-
-    return match instr.funct3 {
-        //sb
-        0x0 => format!("mem 0x{:08x} 0x{:02x}", addr, rs2 as u8),
-        //sh
-        0x1 => format!("mem 0x{:08x} 0x{:04x}", addr, rs2 as u16),
-        //sw
-        0x2 => format!("mem 0x{:08x} 0x{:08x}", addr, rs2),
-        _ => format!(""),
-    };
-}
-
-pub fn spike_debug_b(core: &Core, instr: &BType) -> String {
-    format!("")
-}
-
-pub fn spike_debug_u(core: &Core, instr: &UType) -> String {
-    format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize])
-}
-
-pub fn spike_debug_j(core: &Core, instr: &JType) -> String {
-    if instr.rd != 0 {
-        return format!("x{} 0x{:08x}", instr.rd, core.reg_file[instr.rd as usize]);
-    }
-    format!("")
+pub fn print_state_gdb(core: &Core) {
+    println!(
+        "ra: 0x{:x}\nsp: 0x{:x}\ngp: 0x{:x}\ntp: 0x{:x}\nt0: 0x{:x}\nt1: 0x{:x}\nt2: 0x{:x}\nfp: 0x{:x}\ns1: 0x{:x}\na0: 0x{:x}\na1: 0x{:x}\na2: 0x{:x}\na3: 0x{:x}\na4: 0x{:x}\na5: 0x{:x}\na6: 0x{:x}\na7: 0x{:x}\ns2: 0x{:x}\ns3: 0x{:x}\ns4: 0x{:x}\ns5: 0x{:x}\ns6: 0x{:x}\ns7: 0x{:x}\ns8: 0x{:x}\ns9: 0x{:x}\ns10: 0x{:x}\ns11: 0x{:x}\nt3: 0x{:x}\nt4: 0x{:x}\nt5: 0x{:x}\nt6: 0x{:x}\npc: 0x{:x}",
+        core.reg_file[1] as u32,
+        core.reg_file[2] as u32,
+        core.reg_file[3] as u32,
+        core.reg_file[4] as u32,
+        core.reg_file[5] as u32,
+        core.reg_file[6] as u32,
+        core.reg_file[7] as u32,
+        core.reg_file[8] as u32,
+        core.reg_file[9] as u32,
+        core.reg_file[10] as u32,
+        core.reg_file[11] as u32,
+        core.reg_file[12] as u32,
+        core.reg_file[13] as u32,
+        core.reg_file[14] as u32,
+        core.reg_file[15] as u32,
+        core.reg_file[16] as u32,
+        core.reg_file[17] as u32,
+        core.reg_file[18] as u32,
+        core.reg_file[19] as u32,
+        core.reg_file[20] as u32,
+        core.reg_file[21] as u32,
+        core.reg_file[22] as u32,
+        core.reg_file[23] as u32,
+        core.reg_file[24] as u32,
+        core.reg_file[25] as u32,
+        core.reg_file[26] as u32,
+        core.reg_file[27] as u32,
+        core.reg_file[28] as u32,
+        core.reg_file[29] as u32,
+        core.reg_file[30] as u32,
+        core.reg_file[31] as u32,
+        core.pc,
+    );
 }
