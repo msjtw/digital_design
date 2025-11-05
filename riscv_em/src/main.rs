@@ -11,8 +11,8 @@ use termion::raw::IntoRawMode;
 
 const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
-const DEBUG: bool = true;
-const SPIKE_DEBUG: bool = true;
+const DEBUG: bool = false;
+const SPIKE_DEBUG: bool = false;
 const PRINT_START: u64 = 1e10 as u64;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -22,12 +22,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    // let mut _stdout = std::io::stdout().into_raw_mode().unwrap(); // Optional: raw mode
+    let mut _stdout = std::io::stdout().into_raw_mode().unwrap(); // Optional: raw mode
     let mut memory = memory::Memory::default();
     let mut proc = core::Core::new(&mut memory);
     proc.read_data(
         &args[1], //kernel Image
-        "/home/msjtw/Documents/digital_design/riscv_em/device_tree/spike.dtb",
+        "/home/msjtw/Documents/digital_design/riscv_em/device_tree/sixtyfourmb_spike.dtb",
     )?;
 
     let start_time = SystemTime::now();

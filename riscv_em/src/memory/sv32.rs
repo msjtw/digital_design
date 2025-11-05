@@ -170,13 +170,17 @@ pub fn translate(
     // When MPRV=0, loads and stores behave as of the current privilege mode.
     // When MPRV=1, loads and stores behave as though the current privilege mode were set to MPP
     let mstatus = csr::read(csr::Csr::mstatus, core);
+    let mstatus_mxr = (mstatus >> 19) & 0b1;
+    let mstatus_sum = (mstatus >> 18) & 0b1;
     let mprv = (mstatus >> 17) & 0b1;
+
     let mode;
     if a_type != AccessType::X && mprv > 0 {
         mode = (mstatus >> 11) & 0b11;
     } else {
         mode = core.mode;
     }
+
     if satp.mode == 0 || mode > 1 {
         return Ok((
             virt_a,
@@ -193,63 +197,22 @@ pub fn translate(
     let mut a = satp.ppn * PAGESIZE;
     let mut i = LEVELS - 1;
 
-    // if virt_a == 0xc1405528 {
-    //     println!("--------");
-    //     println!("mode: {}, pc: 0x{:08x}", core.mode, core.pc);
-    //     println!("{}", core.instr_str);
-    //     println!("satp 0b{:b}", csr::read(csr::Csr::satp, core));
-    //     println!("satp {:?}", satp);
-    //     println!("a:   0x{:x}", a);
-    //
-    //     println!("va 0b{:b}", virt_a);
-    //     println!("va 0x{:x}", virt_a);
-    //     println!("va {:?}", va);
-    // }
-
     // level 1
     let index = va.vpn1 * PTESIZE;
     let mut pte_addr = a + index;
     let pte_m1 = phys_read_word(pte_addr, core)?;
 
-    // if virt_a == 0xc1405528 {
-    //     println!("pte addr: 0x{:x}", a + index);
-    //     println!("pte_1: 0b{:b}", pte_m1);
-    // }
-
     let mut pte = PTE::from(pte_m1);
 
-    // if virt_a == 0xc1405528 {
-    //     println!("{:?}", pte);
-    // }
-
-    // process::exit(1);
-
-    // println!("full pte");
-    // for i in 0..1023 {
-    //     let addr = a + (PTESIZE * i);
-    //     println!("0x{:x}: 0b{:b}", addr, phys_read_word(addr, core)?);
-    // }
-
     if !pte.v || (!pte.r && pte.w) {
-        // page fault
-        // println!("page fault 1 {:?}", pte);
-        // println!("*-------");
-        // println!("mode: {}, pc: 0x{:08x}", core.mode, core.pc);
-        // println!("{}", core.instr_str);
-        // println!("satp 0b{:b}", csr::read(csr::Csr::satp, core));
-        // println!("satp {:?}", satp);
-        // println!("a:   0x{:x}", a);
-        //
-        // println!("va 0b{:032b}", virt_a);
-        // println!("va 0x{:08x}", virt_a);
-        // println!("va {:?}", va);
-        // println!("page fault 1");
-        // println!("pte *0x{:08x} {:?}", a + index, pte);
-        // println!("+-------");
+        // print!(" mmu6 ");
         return Err(None);
     }
 
     if !(pte.r || pte.x) {
+        if pte.d || pte.a || pte.u {
+            return Err(None);
+        }
         //level 0
         i -= 1;
         a = pte.ppn * PAGESIZE;
@@ -257,51 +220,39 @@ pub fn translate(
         pte_addr = a + index;
         let pte_m0 = phys_read_word(pte_addr, core)?;
         pte = PTE::from(pte_m0);
-        // if virt_a == 0xc1405528 {
-        //     println!("\tpte addr: 0x{:x}", a + index);
-        //     println!("\tpte_0: 0b{:b}", pte_m0);
-        //     println!("\t{:?}", pte);
-        // }
         if !pte.v || (!pte.r && pte.w) {
             // page fault
-            println!("page fault 2");
+            // print!(" mmu5 ");
             return Err(None);
         }
 
         if !(pte.r || pte.x) {
             // level < 0
             // page fault
-            println!("page fault 3");
+            // print!(" mmu4 ");
             return Err(None);
+        }
+
+        if pte.u {
+            //user page
+            if (mode == 1 && mstatus_sum == 0) || mode > 1 {
+                // print!(" mmu3 ");
+                return Err(None);
+            }
+        } else {
+            //supervisor page
+            if mode != 1 {
+                // print!(" mmu2 ");
+                return Err(None);
+            }
         }
     }
 
     // leaf pte has been reached
-    //
     if i > 0 && pte.ppn0 != 0 {
         // misaligned superpage
-        println!("page fault 4");
+        // print!(" mmu1 ");
         return Err(None);
-    }
-
-    // if i > 0 {
-    //     print!("superpage  ");
-    // }
-
-    let mstatus_sum = mstatus & (1 << 18);
-    let mstatus_mxr = mstatus & (1 << 19);
-    if !pte.u && mode != 1 {
-        // access supervisor page not from S-mode
-        println!("page fault 4");
-        return Err(None);
-    }
-    if pte.u && mode != 0 {
-        // access user page not from U-mode
-        // check for SUM of mstatus
-        if !(mode == 1) || !(mstatus_sum > 0) {
-            println!("page fault 5");
-            return Err(None);
-        }
     }
 
     let pa = PA {
@@ -311,15 +262,6 @@ pub fn translate(
     };
 
     let phys_a: u32 = pa.into();
-
-    // if virt_a == 0xc1405528 || virt_a == 0xc015ea2c {
-    //     println!("pc: 0x{:08x}: 0x{:x} -> 0x{:x}", core.pc, virt_a, phys_a);
-    //     println!(
-    //         "mem[0x{:08x}] = 0x{:08x}",
-    //         phys_a,
-    //         phys_read_word(phys_a, core).unwrap_or(0)
-    //     );
-    // }
 
     let res: (u32, MemoryPermissions);
     if mstatus_mxr > 0 {
@@ -343,16 +285,27 @@ pub fn translate(
         );
     }
 
-    let mut pte = pte.set_a();
-    match a_type {
-        AccessType::W => pte = pte.set_d(),
-        _ => {}
+    // Svade extension
+    if !pte.a || (a_type == AccessType::W && !pte.d){
+        return Err(None);
     }
-    let pte_u32: u32 = pte.into();
 
-    phys_write_word(pte_addr, pte_u32, core)?;
+    // let mut pte = pte.set_a();
+    // match a_type {
+    //     AccessType::W => pte = pte.set_d(),
+    //     _ => {}
+    // }
+    // let pte_u32: u32 = pte.into();
+    //
+    // phys_write_word(pte_addr, pte_u32, core)?;
 
     core.last_pa = phys_a;
+
+    if virt_a == 0x9d2526fc {
+        // core.instr_str = format!("pte0>{:?}< {}", pte, core.instr_str);
+        // print!("0x{:08x} -> 0x{:08x}", virt_a, res.0);
+        // println!("\t pte {:?}", pte);riscv pma
+    }
 
     return Ok(res);
 }

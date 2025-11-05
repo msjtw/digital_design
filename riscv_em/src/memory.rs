@@ -94,7 +94,7 @@ pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Excepti
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
-            println!("mmu error 3");
+            // println!("mmu error 3");
             match x {
                 Some(x) => return Err(x),
                 None => {
@@ -136,12 +136,12 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
             if perm.w {
                 return phys_write_word(phys_addr, data, core);
             }
-            println!("mmu error 51");
+            // println!("mmu error 51");
             core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
-            println!("mmu error 5");
+            // println!("mmu error 5");
             match x {
                 Some(x) => return Err(x),
                 None => {
@@ -162,12 +162,12 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
             if perm.w {
                 return phys_write_hword(phys_addr, data, core);
             }
-            println!("mmu error 61");
+            // println!("mmu error 61");
             core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
-            println!("mmu error 6");
+            // println!("mmu error 6");
             match x {
                 Some(x) => return Err(x),
                 None => {
@@ -184,12 +184,12 @@ pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions
             if perm.w {
                 return phys_write_byte(phys_addr, data, core);
             }
-            println!("mmu error 71");
+            // println!("mmu error 71");
             core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
-            println!("mmu error 7 {:?}", x);
+            // println!("mmu error 7 {:?} 0x{:08x}", x, addr);
             match x {
                 Some(x) => return Err(x),
                 None => {
@@ -256,14 +256,6 @@ pub fn phys_fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Ex
 
     let memory = &core.memory;
 
-    if addr > super::RAM_OFFSET + super::RAM_SIZE {
-        // return Err(exceptions::Exception::Instruction_access_fault);
-        println!(
-            "max: 0x{:x} < 0x{:x}",
-            super::RAM_OFFSET + super::RAM_SIZE,
-            addr
-        );
-    }
     let address = (addr - memory.base_addr) as usize;
     let d = memory.data[address] as u32;
     let c = memory.data[address + 1] as u32;

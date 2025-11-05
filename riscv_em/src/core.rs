@@ -121,9 +121,16 @@ impl<'a> Core<'a> {
             curr_cycle += 1;
 
             if super::DEBUG
+                && (self.pc == 0xc0260c44 || csr::read_64(Csr64::mcycle, self) > super::PRINT_START)
+                && !self.p_start
+            {
+                println!("print start!");
+                self.p_start = true;
+            }
+
+            if super::DEBUG
                 && (self.pc == 0x80400094 || csr::read_64(Csr64::mcycle, self) > super::PRINT_START)
             {
-                self.p_start = true;
                 self.mtime = 0xc9f4;
             }
 
@@ -196,7 +203,7 @@ impl<'a> Core<'a> {
 
                             if self.p_start {
                                 self.instr_str = format!(
-                                    "core   0: {} 0x{:x?} (0x{:08x?})\t",
+                                    "core   0: {} 0x{:08x?} (0x{:08x?})\t",
                                     self.mode, self.pc, instr_fetch
                                 );
                             }
@@ -229,7 +236,7 @@ impl<'a> Core<'a> {
                                     "core   0: {} 0x{:x?} (0x{:08x?})\t",
                                     self.mode, self.pc, instr_fetch
                                 );
-                                eprintln!("0x{:x?}: 0x{:08x?}", self.pc, instr_fetch);
+                                eprintln!("0x{:08x?}: 0x{:08x?}", self.pc, instr_fetch);
                             } else {
                                 eprintln!("{}", self.instr_str);
                             }
@@ -289,13 +296,17 @@ impl<'a> Core<'a> {
         } else {
             // exception
             csr::write(Csr::mcause, self.trap, self);
-            if self.trap <= 7 || (self.trap >= 12 && self.trap <= 15) {
-                // breakpoint (3); address-misaligned (0, 4, 6);
-                // access-fault (1, 5, 7); page-fault(12, 13, 15)
-                csr::write(Csr::mtval, self.trap_val, self);
-            } else {
-                csr::write(Csr::mtval, 0, self);
-            }
+            // address:
+            // breakpoint (3); address-misaligned (0, 4, 6);
+            // access-fault (1, 5, 7); page-fault(12, 13, 15);
+            // faulting instruction:
+            // instruction fault (2)
+            match self.trap {
+                0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 12 | 13 | 15 => {
+                    csr::write(Csr::mtval, self.trap_val, self)
+                }
+                _ => csr::write(Csr::mtval, 0, self),
+            };
         }
 
         let mstatus = csr::read(Csr::mstatus, self);
@@ -353,12 +364,14 @@ impl<'a> Core<'a> {
         } else {
             // exception
             csr::write(Csr::scause, self.trap, self);
-            if self.trap > 4 && self.trap <= 7 {
-                // address misaligned, access fault, ecall
-                csr::write(Csr::stval, self.trap_val, self);
-            } else {
-                csr::write(Csr::stval, self.pc, self);
-            }
+            // breakpoint (3); address-misaligned (0, 4, 6);
+            // access-fault (1, 5, 7); page-fault(12, 13, 15)
+            match self.trap {
+                0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 12 | 13 | 15 => {
+                    csr::write(Csr::stval, self.trap_val, self)
+                }
+                _ => csr::write(Csr::stval, 0, self),
+            };
         }
 
         let mstatus = csr::read(Csr::mstatus, self);
@@ -379,9 +392,6 @@ impl<'a> Core<'a> {
         csr::write(Csr::sepc, self.pc, self);
         // jump to handler
         let stvec = csr::read(Csr::stvec, self);
-        // if stvec & 0b11 != 0 {
-        //     println!("stvec vectored mode")
-        // }
         match stvec & 0b11 {
             0 => self.pc = stvec,
             1 => {
