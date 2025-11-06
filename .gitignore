@@ -1,11 +1,3 @@
-bin/
-instr/
-sixtyfourmb.dtb
-Image
-obj_dir/
-assembly/
-vcd_dump/
-elf_test/
-riscv_em/target
-buildroot/
-gdb.txt
+debug
+target
+sixtyfourmb*

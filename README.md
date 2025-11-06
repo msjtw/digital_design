@@ -1,18 +1,30 @@
 # digital_design
 
-## Logisim Simulations
-Directory containing logisim files for simple circuits.
-
-## HDL exercises
-My solutions for exercises from the 4th chapter of the Digital Design and Computer Architecture book.
-
-## Multicycle Processor (WIP)
-Implementation in System Verilog of simple RISC-V core based on schematics from Digital Design and Computer Architecture book.
-
 ## riscv_em
-RISC-V (RV32IMA) core emulator written in rust. It's capable of execution of simple stand-alone ELF binaries.
+RISC-V core emulator written in rust.
+
+Features:
+- ima extensions
+- machine, supervisor and user modes
+- physical memory protection
+- virtual memory 
+- ns16550a uart
+
+What is missing:
+- c extension (no compressed instructions)
+- plic (there are no external interrupts, keyboard is read by polling)
+- external devices like block device
+- any kind of optimization, it's painfully slow
+
+To run it you need to build a buildroot image and link it into a single binary with OpenSBI (FW_PAYLOAD).
+Or you can use the image from ```image/Image```.
 
 ```bash
-riscv32-unknown-elf-gcc -o main main.c
-./riscv_em main
+cd riscv_em
+cargo build
+./target/debug/riscv_em ../image/Image   
 ```
+
+## instr
+It's the decoding function extracted from the main emulator.
+
