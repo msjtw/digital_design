@@ -186,6 +186,11 @@ pub fn translate(
         ));
     }
 
+    // check tlb
+    if let Some(v) = core.memory.tlb.get(&(mode, virt_a)) {
+        return Ok(v.clone());
+    }
+
     let va = VA::from(virt_a);
 
     let mut a = satp.ppn * PAGESIZE;
@@ -293,5 +298,6 @@ pub fn translate(
     //
     // phys_write_word(pte_addr, pte_u32, core)?;
 
+    core.memory.tlb.insert((mode, virt_a), res);
     return Ok(res);
 }

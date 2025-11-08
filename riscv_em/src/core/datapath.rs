@@ -641,6 +641,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 0b0 => {
                     //sfence
                     if instr.funct7 == 0b0001001 {
+                        memory::tlb_flush(core);
                         core.pc += 4;
                         return Ok(State::Ok);
                     }

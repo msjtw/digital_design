@@ -5,6 +5,15 @@ use crate::core::{Core, exceptions};
 use std::io::{Bytes, Read, Write};
 use sv32::AccessType;
 use termion::async_stdin;
+use std::collections::HashMap;
+
+
+#[derive(Debug, Clone, Copy)]
+pub struct MemoryPermissions {
+    r: bool,
+    w: bool,
+    x: bool,
+}
 
 // #[derive(Debug)]
 pub struct Memory {
@@ -13,6 +22,8 @@ pub struct Memory {
 
     stdin: Bytes<termion::AsyncReader>,
     read_byte: u8,
+
+    tlb: HashMap<(u32, u32),(u32, MemoryPermissions)>,
 }
 
 impl Default for Memory {
@@ -23,14 +34,14 @@ impl Default for Memory {
 
             stdin: async_stdin().bytes(),
             read_byte: 0,
+
+            tlb: HashMap::new(),
         }
     }
 }
 
-pub struct MemoryPermissions {
-    r: bool,
-    w: bool,
-    x: bool,
+pub fn tlb_flush(core: &mut Core){
+    core.memory.tlb.clear();
 }
 
 pub fn read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {

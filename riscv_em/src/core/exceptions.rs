@@ -1,6 +1,7 @@
 #[allow(non_camel_case_types, dead_code)]
 #[derive(Debug)]
 pub enum Exception {
+    Clear,
     Instruction_address_misaligned,
     Instruction_access_fault,
     Illegal_instruction,
@@ -18,8 +19,9 @@ pub enum Exception {
     Hardware_error,
 }
 
-pub fn exception_number(exc: Exception) -> u32 {
+pub fn exception_number(exc: & Exception) -> u32 {
     match exc {
+        Exception::Clear => u32::MAX,
         Exception::Instruction_address_misaligned => 0,
         Exception::Instruction_access_fault => 1,
         Exception::Illegal_instruction => 2,
