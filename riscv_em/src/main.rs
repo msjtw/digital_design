@@ -1,9 +1,12 @@
 mod core;
+mod device;
 mod memory;
+use core::Core;
 use std::env;
 use std::error::Error;
 use std::process;
 
+use memory::Memory;
 use std::time::SystemTime;
 use termion::raw::IntoRawMode;
 
@@ -11,13 +14,14 @@ const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
 const DEBUG: bool = false;
 const SPIKE_DEBUG: bool = true;
-const PRINT_START: u64 = 0 as u64;
+const PRINT_START: u64 = 1e10 as u64;
 const REAL_TIME: bool = false;
 
-// struct SoC {
-//     core: core::Core,
-//     memory: memory::Memory,
-// }
+struct SoC<'a> {
+    core: &'a mut core::Core,
+    memory: &'a mut memory::Memory,
+    devices: &'a mut Vec<device::Device>,
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -27,9 +31,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // let mut _stdout = std::io::stdout().into_raw_mode().unwrap(); // Optional: raw mode
-    let mut memory = memory::Memory::default();
-    let mut proc = core::Core::new(&mut memory);
-    proc.read_data(
+
+    let mut core = Core::default();
+    let mut memory = Memory::default();
+    let mut devices = vec![];
+
+    let mut soc = SoC {
+        core: &mut core,
+        memory: &mut memory,
+        devices: &mut devices,
+    };
+    // let mut memory = memory::Memory::default();
+    // let mut proc = core::Core::new(&mut memory);
+    core::read_data(
+        &mut soc,
         &args[1], //kernel Image
         "/home/msjtw/Documents/digital_design/riscv_em/device_tree/sixtyfourmb_spike.dtb",
     )?;
@@ -37,13 +52,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut last_time = SystemTime::now();
 
     loop {
-        match proc.run(5000) {
+        match core::run(&mut soc, 5000) {
             core::State::Ok => {}
             core::State::Sleep => {
                 // println!("Sleep... 0x{:08x} < 0x{:08x}; {}", proc.mtime, proc.mtimecmp, i128::from(proc.mtimecmp) - i128::from(proc.mtime));
                 // println!("mie: 0b{:b}", proc.csr_file[0x304]);
                 // ctr = ctr.max(proc.mtimecmp);
-                proc.mtime = proc.mtime.max(proc.mtimecmp);
+                soc.core.mtime = soc.core.mtime.max(soc.core.mtimecmp);
                 // proc.sleep = true;
                 // let add_time = (proc.memory.csr_read(memory::Time::Mtimecmp) as i64
                 //     - proc.memory.csr_read(memory::Time::Mtime) as i64)
@@ -69,14 +84,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .unwrap()
                 .as_millis() as u64;
             last_time = SystemTime::now();
-            proc.mtime += time_diff;
+            soc.core.mtime += time_diff;
         } else {
-            proc.mtime += 50;
+            soc.core.mtime += 50;
         }
 
-        proc.lr_address = 0x0;
-        if proc.p_start {
-            eprintln!("mtime change 0x{:x}", proc.mtime);
+        soc.core.lr_address = 0x0;
+        if soc.core.p_start {
+            eprintln!("mtime change 0x{:x}", soc.core.mtime);
         }
     }
 

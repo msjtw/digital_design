@@ -6,6 +6,7 @@ use std::io::{Bytes, Read, Write};
 use sv32::AccessType;
 use termion::async_stdin;
 use std::collections::HashMap;
+use crate::SoC;
 
 
 #[derive(Debug, Clone, Copy)]
@@ -40,21 +41,21 @@ impl Default for Memory {
     }
 }
 
-pub fn tlb_flush(core: &mut Core){
-    core.memory.tlb.clear();
+pub fn tlb_flush(memory: &mut Memory){
+    memory.tlb.clear();
 }
 
-pub fn read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
+pub fn read_word(addr: u32, soc: &mut SoC) -> Result<u32, exceptions::Exception> {
     if addr & 0b11 > 0 {
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::Load_address_misaligned);
     }
-    match sv32::translate(addr, core, AccessType::R) {
+    match sv32::translate(addr, soc, AccessType::R) {
         Ok((phys_addr, perm)) => {
             if perm.r {
-                return phys_read_word(phys_addr, core);
+                return phys_read_word(phys_addr, soc);
             }
-            core.trap_val = addr;
+            soc.core.trap_val = addr;
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
@@ -62,20 +63,20 @@ pub fn read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exceptio
             match x {
                 Some(x) => return Err(x),
                 None => {
-                    core.trap_val = addr;
+                    soc.core.trap_val = addr;
                     return Err(exceptions::Exception::Load_page_fault);
                 }
             };
         }
     };
 }
-pub fn fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
-    match sv32::translate(addr, core, AccessType::X) {
+pub fn fetch_word(addr: u32, soc: &mut SoC) -> Result<u32, exceptions::Exception> {
+    match sv32::translate(addr, soc, AccessType::X) {
         Ok((phys_addr, perm)) => {
             if perm.x {
-                return phys_fetch_word(phys_addr, core);
+                return phys_fetch_word(phys_addr, soc);
             }
-            core.trap_val = addr;
+            soc.core.trap_val = addr;
             return Err(exceptions::Exception::Instruction_page_fault);
         }
         Err(x) => {
@@ -83,24 +84,24 @@ pub fn fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Excepti
             match x {
                 Some(x) => return Err(x),
                 None => {
-                    core.trap_val = addr;
+                    soc.core.trap_val = addr;
                     return Err(exceptions::Exception::Instruction_page_fault);
                 }
             };
         }
     };
 }
-pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Exception> {
+pub fn read_hword(addr: u32, soc: &mut SoC) -> Result<u16, exceptions::Exception> {
     if addr & 0b1 > 0 {
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::Load_address_misaligned);
     }
-    match sv32::translate(addr, core, AccessType::R) {
+    match sv32::translate(addr, soc, AccessType::R) {
         Ok((phys_addr, perm)) => {
             if perm.r {
-                return phys_read_hword(phys_addr, core);
+                return phys_read_hword(phys_addr, soc);
             }
-            core.trap_val = addr;
+            soc.core.trap_val = addr;
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
@@ -108,20 +109,20 @@ pub fn read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Excepti
             match x {
                 Some(x) => return Err(x),
                 None => {
-                    core.trap_val = addr;
+                    soc.core.trap_val = addr;
                     return Err(exceptions::Exception::Load_page_fault);
                 }
             };
         }
     };
 }
-pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception> {
-    match sv32::translate(addr, core, AccessType::R) {
+pub fn read_byte(addr: u32, soc: &mut SoC) -> Result<u8, exceptions::Exception> {
+    match sv32::translate(addr, soc, AccessType::R) {
         Ok((phys_addr, perm)) => {
             if perm.r {
-                return phys_read_byte(phys_addr, core);
+                return phys_read_byte(phys_addr, soc);
             }
-            core.trap_val = addr;
+            soc.core.trap_val = addr;
             return Err(exceptions::Exception::Load_page_fault);
         }
         Err(x) => {
@@ -129,25 +130,25 @@ pub fn read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception
             match x {
                 Some(x) => return Err(x),
                 None => {
-                    core.trap_val = addr;
+                    soc.core.trap_val = addr;
                     return Err(exceptions::Exception::Load_page_fault);
                 }
             };
         }
     };
 }
-pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
+pub fn write_word(addr: u32, data: u32, soc: &mut SoC) -> Result<u32, exceptions::Exception> {
     if addr & 0b11 > 0 {
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::StoreAMO_address_misaligned);
     }
-    match sv32::translate(addr, core, AccessType::W) {
+    match sv32::translate(addr, soc, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
-                return phys_write_word(phys_addr, data, core);
+                return phys_write_word(phys_addr, data, soc);
             }
             // println!("mmu error 51");
-            core.trap_val = addr;
+            soc.core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
@@ -155,25 +156,25 @@ pub fn write_word(addr: u32, data: u32, core: &mut Core) -> Result<u32, exceptio
             match x {
                 Some(x) => return Err(x),
                 None => {
-                    core.trap_val = addr;
+                    soc.core.trap_val = addr;
                     return Err(exceptions::Exception::StoreAMO_page_fault);
                 }
             };
         }
     };
 }
-pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptions::Exception> {
+pub fn write_hword(addr: u32, data: u16, soc: &mut SoC) -> Result<(), exceptions::Exception> {
     if addr & 0b1 > 0 {
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::StoreAMO_address_misaligned);
     }
-    match sv32::translate(addr, core, AccessType::W) {
+    match sv32::translate(addr, soc, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
-                return phys_write_hword(phys_addr, data, core);
+                return phys_write_hword(phys_addr, data, soc);
             }
             // println!("mmu error 61");
-            core.trap_val = addr;
+            soc.core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
@@ -181,21 +182,21 @@ pub fn write_hword(addr: u32, data: u16, core: &mut Core) -> Result<(), exceptio
             match x {
                 Some(x) => return Err(x),
                 None => {
-                    core.trap_val = addr;
+                    soc.core.trap_val = addr;
                     return Err(exceptions::Exception::StoreAMO_page_fault);
                 }
             };
         }
     };
 }
-pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions::Exception> {
-    match sv32::translate(addr, core, AccessType::W) {
+pub fn write_byte(addr: u32, data: u8, soc: &mut SoC) -> Result<(), exceptions::Exception> {
+    match sv32::translate(addr, soc, AccessType::W) {
         Ok((phys_addr, perm)) => {
             if perm.w {
-                return phys_write_byte(phys_addr, data, core);
+                return phys_write_byte(phys_addr, data, soc);
             }
             // println!("mmu error 71");
-            core.trap_val = addr;
+            soc.core.trap_val = addr;
             return Err(exceptions::Exception::StoreAMO_page_fault);
         }
         Err(x) => {
@@ -203,7 +204,7 @@ pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions
             match x {
                 Some(x) => return Err(x),
                 None => {
-                    core.trap_val = addr;
+                    soc.core.trap_val = addr;
                     return Err(exceptions::Exception::StoreAMO_page_fault);
                 }
             };
@@ -211,38 +212,38 @@ pub fn write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions
     };
 }
 
-pub fn phys_read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
-    let perm = pmp::pmp_check(addr, 4, core);
+pub fn phys_read_word(addr: u32, soc: &mut SoC) -> Result<u32, exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 4, soc.core);
     if !perm.r {
         // println!("1 Error! read:0x{:x}", addr);
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 
-    let memory = &core.memory;
+    let memory = &soc.memory;
 
     if addr < memory.base_addr {
         return match addr {
             0x200bffc => {
-                if core.p_start {
-                    eprintln!("mtime change 0x{:x}", core.mtime);
+                if soc.core.p_start {
+                    eprintln!("mtime change 0x{:x}", soc.core.mtime);
                 }
-                Ok((core.mtime >> 32) as u32)
+                Ok((soc.core.mtime >> 32) as u32)
             }
             0x200bff8 => {
-                if core.p_start {
-                    eprintln!("mtime change 0x{:x}", core.mtime);
+                if soc.core.p_start {
+                    eprintln!("mtime change 0x{:x}", soc.core.mtime);
                 }
-                Ok(core.mtime as u32)
+                Ok(soc.core.mtime as u32)
             }
-            // 0x11004004 => Ok((core.mtimecmp >> 32) as u32),
-            // 0x11004000 => Ok(core.mtimecmp as u32),
+            // 0x11004004 => Ok((soc.core.mtimecmp >> 32) as u32),
+            // 0x11004000 => Ok(soc.core.mtimecmp as u32),
             _ => {
-                // if addr >= 0x00001020 && addr - 0x00001020 < core.dtb.len() as u32 {
-                //     let d = core.dtb[addr as usize - 0x00001020usize] as u32;
-                //     let c = core.dtb[addr as usize - 0x0000101fusize] as u32;
-                //     let b = core.dtb[addr as usize - 0x0000101eusize] as u32;
-                //     let a = core.dtb[addr as usize - 0x0000101dusize] as u32;
+                // if addr >= 0x00001020 && addr - 0x00001020 < soc.core.dtb.len() as u32 {
+                //     let d = soc.core.dtb[addr as usize - 0x00001020usize] as u32;
+                //     let c = soc.core.dtb[addr as usize - 0x0000101fusize] as u32;
+                //     let b = soc.core.dtb[addr as usize - 0x0000101eusize] as u32;
+                //     let a = soc.core.dtb[addr as usize - 0x0000101dusize] as u32;
                 //     return Ok((a << 24) + (b << 16) + (c << 8) + d);
                 // }
                 Ok(0)
@@ -256,15 +257,15 @@ pub fn phys_read_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exc
     let a = memory.data[address + 3] as u32;
     Ok((a << 24) + (b << 16) + (c << 8) + d)
 }
-pub fn phys_fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Exception> {
-    let perm = pmp::pmp_check(addr, 4, core);
+pub fn phys_fetch_word(addr: u32, soc: &mut SoC) -> Result<u32, exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 4, soc.core);
     if !perm.x {
         // println!("3 Error! read:0x{:x}", addr);
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::Instruction_access_fault);
     }
 
-    let memory = &core.memory;
+    let memory = &soc.memory;
 
     let address = (addr - memory.base_addr) as usize;
     let d = memory.data[address] as u32;
@@ -274,15 +275,15 @@ pub fn phys_fetch_word(addr: u32, core: &mut Core) -> Result<u32, exceptions::Ex
     Ok((a << 24) + (b << 16) + (c << 8) + d)
 }
 
-pub fn phys_read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Exception> {
-    let perm = pmp::pmp_check(addr, 2, core);
+pub fn phys_read_hword(addr: u32, soc: &mut SoC) -> Result<u16, exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 2, soc.core);
     if !perm.r {
         // println!("5 Error! read:0x{:x}", addr);
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 
-    let memory = &core.memory;
+    let memory = &soc.memory;
 
     if addr < memory.base_addr {
         // println!("6 Error! read:0x{:x}", addr);
@@ -293,15 +294,15 @@ pub fn phys_read_hword(addr: u32, core: &mut Core) -> Result<u16, exceptions::Ex
     let a = memory.data[address + 1] as u16;
     Ok((a << 8) + b)
 }
-pub fn phys_read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exception> {
-    let perm = pmp::pmp_check(addr, 1, core);
+pub fn phys_read_byte(addr: u32, soc: &mut SoC) -> Result<u8, exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 1, soc.core);
     if !perm.r {
         // println!("7 Error! read:0x{:x}", addr);
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 
-    let memory = &mut core.memory;
+    let memory = &mut soc.memory;
 
     if addr < memory.base_addr {
         return match addr {
@@ -326,8 +327,8 @@ pub fn phys_read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exce
             }
             _ => {
                 // println!("8 Error! read:0x{:x}", addr);
-                // if addr >= 0x00001020 && addr - 0x00001020 < core.dtb.len() as u32 {
-                //     return Ok(core.dtb[addr as usize - 0x00001020usize]);
+                // if addr >= 0x00001020 && addr - 0x00001020 < soc.core.dtb.len() as u32 {
+                //     return Ok(soc.core.dtb[addr as usize - 0x00001020usize]);
                 // }
                 Ok(0)
             }
@@ -340,16 +341,16 @@ pub fn phys_read_byte(addr: u32, core: &mut Core) -> Result<u8, exceptions::Exce
 pub fn phys_write_word(
     addr: u32,
     data: u32,
-    core: &mut Core,
+    soc: &mut SoC,
 ) -> Result<u32, exceptions::Exception> {
-    let perm = pmp::pmp_check(addr, 4, core);
+    let perm = pmp::pmp_check(addr, 4, soc.core);
     if !perm.w {
         // println!("9 Error! write:0x{:x}", addr);
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 
-    let memory = &mut core.memory;
+    let memory = &mut soc.memory;
 
     if addr < memory.base_addr {
         match addr {
@@ -358,26 +359,26 @@ pub fn phys_write_word(
                 return Ok(data);
             }
             // 0x1100bff8 => {
-            //     let mtimel = core.mtime as u32;
-            //     core.mtime = ((data as u64) << 32) + mtimel as u64;
+            //     let mtimel = soc.core.mtime as u32;
+            //     soc.core.mtime = ((data as u64) << 32) + mtimel as u64;
             // }
             // 0x1100bffc => {
-            //     let mtimeh = (core.mtime >> 32) as u32;
-            //     core.mtime = ((mtimeh as u64) << 32) + data as u64;
+            //     let mtimeh = (soc.core.mtime >> 32) as u32;
+            //     soc.core.mtime = ((mtimeh as u64) << 32) + data as u64;
             // }
             0x2004004 => {
-                if core.p_start {
-                    eprintln!("mtime change 0x{:x}", core.mtime);
+                if soc.core.p_start {
+                    eprintln!("mtime change 0x{:x}", soc.core.mtime);
                 }
-                let mtimecmpl = core.mtimecmp as u32;
-                core.mtimecmp = ((data as u64) << 32) + mtimecmpl as u64;
+                let mtimecmpl = soc.core.mtimecmp as u32;
+                soc.core.mtimecmp = ((data as u64) << 32) + mtimecmpl as u64;
             }
             0x2004000 => {
-                if core.p_start {
-                    eprintln!("mtime change 0x{:x}", core.mtime);
+                if soc.core.p_start {
+                    eprintln!("mtime change 0x{:x}", soc.core.mtime);
                 }
-                let mtimecmph = (core.mtimecmp >> 32) as u32;
-                core.mtimecmp = ((mtimecmph as u64) << 32) + data as u64;
+                let mtimecmph = (soc.core.mtimecmp >> 32) as u32;
+                soc.core.mtimecmp = ((mtimecmph as u64) << 32) + data as u64;
             }
             _ => {
                 // println!("10 Error! write:0x{:x}", addr);
@@ -400,15 +401,15 @@ pub fn phys_write_word(
 pub fn phys_write_hword(
     addr: u32,
     data: u16,
-    core: &mut Core,
+    soc: &mut SoC,
 ) -> Result<(), exceptions::Exception> {
-    let perm = pmp::pmp_check(addr, 2, core);
+    let perm = pmp::pmp_check(addr, 2, soc.core);
     if !perm.w {
         // println!("11 Error! write:0x{:x}", addr);
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
-    let memory = &mut core.memory;
+    let memory = &mut soc.memory;
 
     if addr < memory.base_addr {
         // println!("12 Error! write:0x{:x}", addr);
@@ -422,15 +423,15 @@ pub fn phys_write_hword(
     memory.data[address + 1] = c;
     Ok(())
 }
-pub fn phys_write_byte(addr: u32, data: u8, core: &mut Core) -> Result<(), exceptions::Exception> {
-    let perm = pmp::pmp_check(addr, 1, core);
+pub fn phys_write_byte(addr: u32, data: u8, soc: &mut SoC) -> Result<(), exceptions::Exception> {
+    let perm = pmp::pmp_check(addr, 1, soc.core);
     if !perm.w {
         // println!("13 Error! write:0x{:x}", addr);
-        core.trap_val = addr;
+        soc.core.trap_val = addr;
         return Err(exceptions::Exception::Load_access_fault);
     }
 
-    let memory = &mut core.memory;
+    let memory = &mut soc.memory;
 
     if addr < memory.base_addr {
         match addr {

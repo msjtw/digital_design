@@ -1,4 +1,5 @@
-use crate::core::{Core, csr, exceptions};
+use crate::SoC;
+use crate::core::{csr, exceptions};
 
 use super::{MemoryPermissions, phys_read_word};
 
@@ -61,36 +62,10 @@ impl Into<u32> for PTE {
 #[allow(dead_code)]
 impl PTE {
     fn set_a(self) -> Self {
-        Self {
-            ppn: self.ppn,
-            ppn1: self.ppn1,
-            ppn0: self.ppn0,
-            rsw: self.rsw,
-            d: self.d,
-            a: true,
-            g: self.g,
-            u: self.u,
-            x: self.x,
-            w: self.w,
-            r: self.r,
-            v: self.v,
-        }
+        Self { a: true, ..self }
     }
     fn set_d(self) -> Self {
-        Self {
-            ppn: self.ppn,
-            ppn1: self.ppn1,
-            ppn0: self.ppn0,
-            rsw: self.rsw,
-            d: true,
-            a: self.a,
-            g: self.g,
-            u: self.u,
-            x: self.x,
-            w: self.w,
-            r: self.r,
-            v: self.v,
-        }
+        Self { d: true, ..self }
     }
 }
 
@@ -153,17 +128,17 @@ pub enum AccessType {
 
 pub fn translate(
     virt_a: u32,
-    core: &mut Core,
+    soc: &mut SoC,
     a_type: AccessType,
 ) -> Result<(u32, MemoryPermissions), Option<exceptions::Exception>> {
-    let satp = csr::read(csr::Csr::satp, core);
+    let satp = csr::read(csr::Csr::satp, soc.core);
     let satp = SATP::from(satp);
 
     // The satp register must be active, i.e., the effective privilege mode must be S-mode or U-mode.
     // The MPRV (Modify PRiVilege) bit modifies the effective privilege mode.
     // When MPRV=0, loads and stores behave as of the current privilege mode.
     // When MPRV=1, loads and stores behave as though the current privilege mode were set to MPP
-    let mstatus = csr::read(csr::Csr::mstatus, core);
+    let mstatus = csr::read(csr::Csr::mstatus, soc.core);
     let mstatus_mxr = (mstatus >> 19) & 0b1;
     let mstatus_sum = (mstatus >> 18) & 0b1;
     let mprv = (mstatus >> 17) & 0b1;
@@ -172,7 +147,7 @@ pub fn translate(
     if a_type != AccessType::X && mprv > 0 {
         mode = (mstatus >> 11) & 0b11;
     } else {
-        mode = core.mode;
+        mode = soc.core.mode;
     }
 
     if satp.mode == 0 || mode > 1 {
@@ -187,7 +162,7 @@ pub fn translate(
     }
 
     // check tlb
-    if let Some(v) = core.memory.tlb.get(&(mode, virt_a)) {
+    if let Some(v) = soc.memory.tlb.get(&(mode, virt_a)) {
         return Ok(v.clone());
     }
 
@@ -199,7 +174,7 @@ pub fn translate(
     // level 1
     let index = va.vpn1 * PTESIZE;
     let mut pte_addr = a + index;
-    let pte_m1 = phys_read_word(pte_addr, core)?;
+    let pte_m1 = phys_read_word(pte_addr, soc)?;
 
     let mut pte = PTE::from(pte_m1);
 
@@ -217,7 +192,7 @@ pub fn translate(
         a = pte.ppn * PAGESIZE;
         let index = va.vpn0 * PTESIZE;
         pte_addr = a + index;
-        let pte_m0 = phys_read_word(pte_addr, core)?;
+        let pte_m0 = phys_read_word(pte_addr, soc)?;
         pte = PTE::from(pte_m0);
         if !pte.v || (!pte.r && pte.w) {
             // page fault
@@ -298,6 +273,6 @@ pub fn translate(
     //
     // phys_write_word(pte_addr, pte_u32, core)?;
 
-    core.memory.tlb.insert((mode, virt_a), res);
+    soc.memory.tlb.insert((mode, virt_a), res);
     return Ok(res);
 }

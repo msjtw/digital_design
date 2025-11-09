@@ -1,11 +1,12 @@
-use crate::core::Core;
+use crate::SoC;
 use crate::core::csr::csr_name;
 use crate::core::instr_parse::{BType, IType, JType, RType, SType, UType};
 use crate::memory;
 
 use super::{Exception, State, csr};
 
-pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
+pub fn exec_r(soc: &mut SoC, instr: &RType) -> Result<State, Exception> {
+    let core = &mut soc.core;
     match instr.opcode {
         0b0110011 => {
             match instr.funct3 {
@@ -175,7 +176,14 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
             let addr = core.reg_file[instr.rs1 as usize] as u32;
             let rs2 = core.reg_file[instr.rs2 as usize];
             let rd;
-            match memory::read_word(addr, core) {
+            match memory::read_word(
+                addr,
+                &mut SoC {
+                    core,
+                    memory: soc.memory,
+                    devices: soc.devices,
+                },
+            ) {
                 Ok(x) => rd = x as i32,
                 Err(x) => {
                     return Err(x);
@@ -252,7 +260,15 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
                 _ => return Err(Exception::Illegal_instruction),
             }
             if write {
-                memory::write_word(addr, write_val as u32, core)?;
+                memory::write_word(
+                    addr,
+                    write_val as u32,
+                    &mut SoC {
+                        core,
+                        memory: soc.memory,
+                        devices: soc.devices,
+                    },
+                )?;
             }
             if core.p_start {
                 if instr.rd != 0 {
@@ -283,7 +299,9 @@ pub fn exec_r(core: &mut Core, instr: &RType) -> Result<State, Exception> {
     Ok(State::Ok)
 }
 
-pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
+pub fn exec_i(soc: &mut SoC, instr: &IType) -> Result<State, Exception> {
+    let core = &mut soc.core;
+
     match instr.opcode {
         0b0010011 => {
             match instr.funct3 {
@@ -357,38 +375,39 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
         }
         0b0000011 => {
             let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
+            let soc = &mut SoC{core, memory: soc.memory, devices: soc.devices};
             match instr.funct3 {
                 // lb sign-extended
                 0x0 => {
-                    match memory::read_byte(addr, core) {
+                    match memory::read_byte(addr, soc) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i8),
                         Err(e) => return Err(e),
                     };
                 }
                 // lh
                 0x1 => {
-                    match memory::read_hword(addr, core) {
+                    match memory::read_hword(addr, soc) {
                         Ok(x) => core.reg_file[instr.rd as usize] = i32::from(x as i16),
                         Err(e) => return Err(e),
                     };
                 }
                 // lw
                 0x2 => {
-                    match memory::read_word(addr, core) {
+                    match memory::read_word(addr, soc) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(e) => return Err(e),
                     };
                 }
                 // lbu zero-extended
                 0x4 => {
-                    match memory::read_byte(addr, core) {
+                    match memory::read_byte(addr, soc) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(e) => return Err(e),
                     };
                 }
                 // lhu
                 0x5 => {
-                    match memory::read_hword(addr, core) {
+                    match memory::read_hword(addr, soc) {
                         Ok(x) => core.reg_file[instr.rd as usize] = x as i32,
                         Err(e) => return Err(e),
                     };
@@ -641,7 +660,7 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
                 0b0 => {
                     //sfence
                     if instr.funct7 == 0b0001001 {
-                        memory::tlb_flush(core);
+                        memory::tlb_flush(soc.memory);
                         core.pc += 4;
                         return Ok(State::Ok);
                     }
@@ -736,53 +755,54 @@ pub fn exec_i(core: &mut Core, instr: &IType) -> Result<State, Exception> {
     Ok(State::Ok)
 }
 
-pub fn exec_s(core: &mut Core, instr: &SType) -> Result<State, Exception> {
-    let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
-    let rs2 = core.reg_file[instr.rs2 as usize];
+pub fn exec_s(soc: &mut SoC, instr: &SType) -> Result<State, Exception> {
+    let addr = (soc.core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
+    let rs2 = soc.core.reg_file[instr.rs2 as usize];
 
-    if core.p_start {
-        core.instr_str = match instr.funct3 {
+    if soc.core.p_start {
+        soc.core.instr_str = match instr.funct3 {
             //sb
-            0x0 => format!("{} mem 0x{:08x} 0x{:02x}", core.instr_str, addr, rs2 as u8),
+            0x0 => format!("{} mem 0x{:08x} 0x{:02x}", soc.core.instr_str, addr, rs2 as u8),
             //sh
-            0x1 => format!("{} mem 0x{:08x} 0x{:04x}", core.instr_str, addr, rs2 as u16),
+            0x1 => format!("{} mem 0x{:08x} 0x{:04x}", soc.core.instr_str, addr, rs2 as u16),
             //sw
-            0x2 => format!("{} mem 0x{:08x} 0x{:08x}", core.instr_str, addr, rs2),
-            _ => format!("{}", core.instr_str),
+            0x2 => format!("{} mem 0x{:08x} 0x{:08x}", soc.core.instr_str, addr, rs2),
+            _ => format!("{}", soc.core.instr_str),
         };
     }
 
     let x = match instr.funct3 {
         //sb
-        0x0 => match memory::write_byte(addr, rs2 as u8, core) {
+        0x0 => match memory::write_byte(addr, rs2 as u8, soc) {
             Ok(_) => Ok(0),
             Err(x) => Err(x),
         },
         //sh
-        0x1 => match memory::write_hword(addr, rs2 as u16, core) {
+        0x1 => match memory::write_hword(addr, rs2 as u16, soc) {
             Ok(_) => Ok(0),
             Err(x) => Err(x),
         },
         //sw
-        0x2 => memory::write_word(addr, rs2 as u32, core),
+        0x2 => memory::write_word(addr, rs2 as u32, soc),
         _ => return Err(Exception::Illegal_instruction),
     };
     match x {
         Ok(0x7777) => {
-            core.pc += 4;
+            soc.core.pc += 4;
             return Ok(State::Reboot);
         }
         Ok(0x5555) => {
-            core.pc += 4;
+            soc.core.pc += 4;
             return Ok(State::Shutdown);
         }
-        Ok(_) => core.pc += 4,
+        Ok(_) => soc.core.pc += 4,
         Err(x) => return Err(x),
     }
     Ok(State::Ok)
 }
 
-pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, Exception> {
+pub fn exec_b(soc: &mut SoC, instr: &BType) -> Result<State, Exception> {
+    let core = &mut soc.core;
     let rs1 = core.reg_file[instr.rs1 as usize];
     let rs2 = core.reg_file[instr.rs2 as usize];
     let last_pc = core.pc;
@@ -831,7 +851,8 @@ pub fn exec_b(core: &mut Core, instr: &BType) -> Result<State, Exception> {
     Ok(State::Ok)
 }
 
-pub fn exec_u(core: &mut Core, instr: &UType) -> Result<State, Exception> {
+pub fn exec_u(soc: &mut SoC, instr: &UType) -> Result<State, Exception> {
+    let core = &mut soc.core;
     match instr.opcode {
         //lui
         0b0110111 => {
@@ -854,7 +875,8 @@ pub fn exec_u(core: &mut Core, instr: &UType) -> Result<State, Exception> {
     Ok(State::Ok)
 }
 
-pub fn exec_j(core: &mut Core, instr: &JType) -> Result<State, Exception> {
+pub fn exec_j(soc: &mut SoC, instr: &JType) -> Result<State, Exception> {
+    let core = &mut soc.core;
     match instr.opcode {
         //jal
         0b1101111 => {
