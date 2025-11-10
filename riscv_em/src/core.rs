@@ -307,6 +307,8 @@ pub fn run(soc: &mut SoC, max_cycles: u32) -> State {
     {
         let core = &mut soc.core;
 
+        soc.uart.tick();
+
         let mut mip = csr::read(Csr::mip, core);
         if core.mtime >= core.mtimecmp {
             mip |= 0b10000000;

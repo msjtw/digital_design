@@ -1,13 +1,10 @@
 mod pmp;
 mod sv32;
 
-use crate::core::{Core, exceptions};
-use std::io::{Bytes, Read, Write};
-use sv32::AccessType;
-use termion::async_stdin;
-use std::collections::HashMap;
 use crate::SoC;
-
+use crate::core::{Core, exceptions};
+use std::collections::HashMap;
+use sv32::AccessType;
 
 #[derive(Debug, Clone, Copy)]
 pub struct MemoryPermissions {
@@ -21,10 +18,7 @@ pub struct Memory {
     base_addr: u32,
     data: Vec<u8>,
 
-    stdin: Bytes<termion::AsyncReader>,
-    read_byte: u8,
-
-    tlb: HashMap<(u32, u32),(u32, MemoryPermissions)>,
+    tlb: HashMap<(u32, u32), (u32, MemoryPermissions)>,
 }
 
 impl Default for Memory {
@@ -33,15 +27,12 @@ impl Default for Memory {
             base_addr: super::RAM_OFFSET,
             data: vec![0; super::RAM_SIZE as usize],
 
-            stdin: async_stdin().bytes(),
-            read_byte: 0,
-
             tlb: HashMap::new(),
         }
     }
 }
 
-pub fn tlb_flush(memory: &mut Memory){
+pub fn tlb_flush(memory: &mut Memory) {
     memory.tlb.clear();
 }
 
@@ -305,44 +296,17 @@ pub fn phys_read_byte(addr: u32, soc: &mut SoC) -> Result<u8, exceptions::Except
     let memory = &mut soc.memory;
 
     if addr < memory.base_addr {
-        return match addr {
-            // read uart byte
-            0x10000000 => Ok(memory.read_byte),
-            // check if there is something to read
-            0x10000005 => {
-                let mut bytes_to_read = 0;
-                if let Some(Ok(byte)) = memory.stdin.next() {
-                    if byte == 1 {
-                        let mut next_byte: [u8; 1] = [0];
-                        std::io::stdin().read_exact(&mut next_byte).unwrap();
-                        if next_byte[0] == 3 {
-                            std::process::exit(1);
-                        }
-                    }
-                    memory.read_byte = byte;
-                    bytes_to_read = 1;
-                }
-                let ret = 0x60 | bytes_to_read;
-                Ok(ret)
-            }
-            _ => {
-                // println!("8 Error! read:0x{:x}", addr);
-                // if addr >= 0x00001020 && addr - 0x00001020 < soc.core.dtb.len() as u32 {
-                //     return Ok(soc.core.dtb[addr as usize - 0x00001020usize]);
-                // }
-                Ok(0)
-            }
-        };
+        if soc.uart.claim(addr) {
+            return Ok(soc.uart.read(addr));
+        } else {
+            return Ok(0);
+        }
     }
     let address = (addr - memory.base_addr) as usize;
     Ok(memory.data[address])
 }
 
-pub fn phys_write_word(
-    addr: u32,
-    data: u32,
-    soc: &mut SoC,
-) -> Result<u32, exceptions::Exception> {
+pub fn phys_write_word(addr: u32, data: u32, soc: &mut SoC) -> Result<u32, exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 4, soc.core);
     if !perm.w {
         // println!("9 Error! write:0x{:x}", addr);
@@ -398,11 +362,7 @@ pub fn phys_write_word(
     memory.data[address + 3] = a;
     Ok(0)
 }
-pub fn phys_write_hword(
-    addr: u32,
-    data: u16,
-    soc: &mut SoC,
-) -> Result<(), exceptions::Exception> {
+pub fn phys_write_hword(addr: u32, data: u16, soc: &mut SoC) -> Result<(), exceptions::Exception> {
     let perm = pmp::pmp_check(addr, 2, soc.core);
     if !perm.w {
         // println!("11 Error! write:0x{:x}", addr);
@@ -434,16 +394,17 @@ pub fn phys_write_byte(addr: u32, data: u8, soc: &mut SoC) -> Result<(), excepti
     let memory = &mut soc.memory;
 
     if addr < memory.base_addr {
-        match addr {
-            0x10000000 => {
-                print!("{}", data as char);
-                let _ = std::io::stdout().flush();
-            } // TODO: UART;
-            0x11100000 => {} // TODO: SYSCON;
-            _ => {
-                // println!("14 Error! write:0x{:x}", addr);
-            }
-        };
+        if soc.uart.claim(addr) {
+            soc.uart.write(addr, data);
+        } else {
+            match addr {
+                0x11100000 => {} // TODO: SYSCON;
+                _ => {
+                    // println!("14 Error! write:0x{:x}", addr);
+                }
+            };
+        }
+
         return Ok(());
     }
     let address = (addr - memory.base_addr) as usize;

@@ -8,7 +8,6 @@ use std::process;
 
 use memory::Memory;
 use std::time::SystemTime;
-use termion::raw::IntoRawMode;
 
 const RAM_SIZE: u32 = 64 * 1024 * 1024;
 const RAM_OFFSET: u32 = 0x80000000;
@@ -20,6 +19,7 @@ const REAL_TIME: bool = false;
 struct SoC<'a> {
     core: &'a mut core::Core,
     memory: &'a mut memory::Memory,
+    uart: &'a mut device::ns16550::Uart,
     devices: &'a mut Vec<device::Device>,
 }
 
@@ -34,11 +34,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut core = Core::default();
     let mut memory = Memory::default();
+    let mut uart = device::ns16550::Uart::default();
     let mut devices = vec![];
 
     let mut soc = SoC {
         core: &mut core,
         memory: &mut memory,
+        uart: &mut uart,
         devices: &mut devices,
     };
     // let mut memory = memory::Memory::default();
