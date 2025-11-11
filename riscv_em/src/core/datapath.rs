@@ -182,7 +182,7 @@ pub fn exec_r(soc: &mut SoC, instr: &RType) -> Result<State, Exception> {
                     core,
                     memory: soc.memory,
                     uart: soc.uart,
-                    devices: soc.devices,
+                    plic: soc.plic
                 },
             ) {
                 Ok(x) => rd = x as i32,
@@ -268,7 +268,7 @@ pub fn exec_r(soc: &mut SoC, instr: &RType) -> Result<State, Exception> {
                         core,
                         memory: soc.memory,
                         uart: soc.uart,
-                        devices: soc.devices,
+                        plic: soc.plic
                     },
                 )?;
             }
@@ -377,7 +377,7 @@ pub fn exec_i(soc: &mut SoC, instr: &IType) -> Result<State, Exception> {
         }
         0b0000011 => {
             let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
-            let soc = &mut SoC{core, memory: soc.memory, uart: soc.uart, devices: soc.devices};
+            let soc = &mut SoC{core, memory: soc.memory, uart: soc.uart, plic: soc.plic};
             match instr.funct3 {
                 // lb sign-extended
                 0x0 => {

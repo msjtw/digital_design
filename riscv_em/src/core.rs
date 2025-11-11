@@ -307,7 +307,8 @@ pub fn run(soc: &mut SoC, max_cycles: u32) -> State {
     {
         let core = &mut soc.core;
 
-        soc.uart.tick();
+        soc.uart.tick(soc.plic);
+        soc.plic.tick(core);
 
         let mut mip = csr::read(Csr::mip, core);
         if core.mtime >= core.mtimecmp {
@@ -330,9 +331,9 @@ pub fn run(soc: &mut SoC, max_cycles: u32) -> State {
         Err(_) => {
             let core = &mut soc.core;
             if core.trap != TRAP_CLEAR {
-                // if self.trap != 2 && self.trap != 9 && self.trap != 0x80000007 && self.trap != 0x80000005 {
-                // println!("it's a trap 0x{:x} trap_val 0x{:x}; mtime 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", self.trap,
-                //    self.trap_val, self.mtime, self.mode, self.pc, instr_fetch);
+                // if core.trap == 0x80000009 {
+                // println!("it's a trap 0x{:x} trap_val 0x{:x}; mtime 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", core.trap,
+                //    core.trap_val, core.mtime, core.mode, core.pc, core.instr_fetch);
                 // }
                 if core.trap == 2 {
                     core.trap_val = core.instr_fetch;

@@ -20,7 +20,7 @@ struct SoC<'a> {
     core: &'a mut core::Core,
     memory: &'a mut memory::Memory,
     uart: &'a mut device::ns16550::Uart,
-    devices: &'a mut Vec<device::Device>,
+    plic: &'a mut device::plic::Plic,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -35,20 +35,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut core = Core::default();
     let mut memory = Memory::default();
     let mut uart = device::ns16550::Uart::default();
-    let mut devices = vec![];
+    let mut plic = device::plic::Plic::default();
 
     let mut soc = SoC {
         core: &mut core,
         memory: &mut memory,
         uart: &mut uart,
-        devices: &mut devices,
+        plic: &mut plic,
     };
     // let mut memory = memory::Memory::default();
     // let mut proc = core::Core::new(&mut memory);
     core::read_data(
         &mut soc,
         &args[1], //kernel Image
-        "/home/msjtw/Documents/digital_design/riscv_em/device_tree/sixtyfourmb_spike.dtb",
+        "/home/msjtw/Documents/digital_design/riscv_em/device_tree/spike.dtb",
     )?;
 
     let mut last_time = SystemTime::now();

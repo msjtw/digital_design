@@ -51,7 +51,7 @@
       interrupts-extended = <&CPU0_intc 11 &CPU0_intc 9 >;
       reg = <0x0 0xc000000 0x0 0x1000000>;
       riscv,ndev = <0x1f>;
-      riscv,max-priority = <0xf>;
+      riscv,max-priority = <0x1>;
       #interrupt-cells = <1>;
       interrupt-controller;
     };

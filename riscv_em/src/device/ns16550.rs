@@ -2,12 +2,16 @@ use std::io::{Bytes, Read, Stdout, Write};
 use termion::async_stdin;
 use termion::raw::{IntoRawMode, RawTerminal};
 
+use super::plic::Plic;
+
 pub struct Uart {
     base: u32,
     length: u32,
+    interrupt_id: usize,
 
     stdin: Bytes<termion::AsyncReader>,
     stdout: RawTerminal<Stdout>,
+    // stdout: Stdout,
     bytes_to_read: u8,
 
     dll: u8,
@@ -28,9 +32,11 @@ impl Default for Uart {
     fn default() -> Self {
         Uart {
             base: 0x10000000,
-            length: 0x10,
+            length: 0x100,
+            interrupt_id: 1,
             stdin: async_stdin().bytes(),
             stdout: std::io::stdout().into_raw_mode().unwrap(),
+            // stdout: std::io::stdout(),
             bytes_to_read: 0,
             dll: 0,
             dlh: 0,
@@ -55,7 +61,7 @@ impl Uart {
         return false;
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, plic: &mut Plic) {
         if self.bytes_to_read == 0 {
             if let Some(Ok(byte)) = self.stdin.next() {
                 if byte == 1 {
@@ -83,7 +89,9 @@ impl Uart {
         }
 
         if self.iir != 1 {
-            // signal interrupt;
+            plic.intt_active |= 1 << self.interrupt_id;
+        } else {
+            plic.intt_active &= !(1 << self.interrupt_id);
         }
     }
 
