@@ -9,20 +9,19 @@ Features:
 - physical memory protection
 - virtual memory 
 - ns16550a uart
+- minimal plic
 
 What is missing:
 - c extension (no compressed instructions)
-- plic (there are no external interrupts, keyboard is read by polling)
 - external devices like block device
-- any kind of optimization, it's painfully slow
 
 To run it you need to build a buildroot image and link it into a single binary with OpenSBI (FW_PAYLOAD).
 Or you can use the image from ```image/Image```.
 
 ```bash
 cd riscv_em
-cargo build
-./target/debug/riscv_em ../image/Image   
+cargo build -r
+./target/release/riscv_em ../image/Image   
 ```
 
 ## instr
