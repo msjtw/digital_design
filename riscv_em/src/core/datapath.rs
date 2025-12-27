@@ -182,7 +182,8 @@ pub fn exec_r(soc: &mut SoC, instr: &RType) -> Result<State, Exception> {
                     core,
                     memory: soc.memory,
                     uart: soc.uart,
-                    plic: soc.plic
+                    plic: soc.plic,
+                    clint: soc.clint,
                 },
             ) {
                 Ok(x) => rd = x as i32,
@@ -268,7 +269,8 @@ pub fn exec_r(soc: &mut SoC, instr: &RType) -> Result<State, Exception> {
                         core,
                         memory: soc.memory,
                         uart: soc.uart,
-                        plic: soc.plic
+                        plic: soc.plic,
+                        clint: soc.clint,
                     },
                 )?;
             }
@@ -377,7 +379,13 @@ pub fn exec_i(soc: &mut SoC, instr: &IType) -> Result<State, Exception> {
         }
         0b0000011 => {
             let addr = (core.reg_file[instr.rs1 as usize] + instr.imm) as u32;
-            let soc = &mut SoC{core, memory: soc.memory, uart: soc.uart, plic: soc.plic};
+            let soc = &mut SoC {
+                core,
+                memory: soc.memory,
+                uart: soc.uart,
+                plic: soc.plic,
+                clint: soc.clint,
+            };
             match instr.funct3 {
                 // lb sign-extended
                 0x0 => {
@@ -764,9 +772,15 @@ pub fn exec_s(soc: &mut SoC, instr: &SType) -> Result<State, Exception> {
     if soc.core.p_start {
         soc.core.instr_str = match instr.funct3 {
             //sb
-            0x0 => format!("{} mem 0x{:08x} 0x{:02x}", soc.core.instr_str, addr, rs2 as u8),
+            0x0 => format!(
+                "{} mem 0x{:08x} 0x{:02x}",
+                soc.core.instr_str, addr, rs2 as u8
+            ),
             //sh
-            0x1 => format!("{} mem 0x{:08x} 0x{:04x}", soc.core.instr_str, addr, rs2 as u16),
+            0x1 => format!(
+                "{} mem 0x{:08x} 0x{:04x}",
+                soc.core.instr_str, addr, rs2 as u16
+            ),
             //sw
             0x2 => format!("{} mem 0x{:08x} 0x{:08x}", soc.core.instr_str, addr, rs2),
             _ => format!("{}", soc.core.instr_str),

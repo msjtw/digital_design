@@ -21,6 +21,7 @@ struct SoC<'a> {
     memory: &'a mut memory::Memory,
     uart: &'a mut device::ns16550::Uart,
     plic: &'a mut device::plic::Plic,
+    clint: &'a mut device::clint::Clint,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -36,12 +37,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut memory = Memory::default();
     let mut uart = device::ns16550::Uart::default();
     let mut plic = device::plic::Plic::default();
+    let mut clint = device::clint::Clint::default();
 
     let mut soc = SoC {
         core: &mut core,
         memory: &mut memory,
         uart: &mut uart,
         plic: &mut plic,
+        clint: &mut clint,
     };
     // let mut memory = memory::Memory::default();
     // let mut proc = core::Core::new(&mut memory);
@@ -60,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 // println!("Sleep... 0x{:08x} < 0x{:08x}; {}", proc.mtime, proc.mtimecmp, i128::from(proc.mtimecmp) - i128::from(proc.mtime));
                 // println!("mie: 0b{:b}", proc.csr_file[0x304]);
                 // ctr = ctr.max(proc.mtimecmp);
-                soc.core.mtime = soc.core.mtime.max(soc.core.mtimecmp);
+                // soc.core.mtime = soc.core.mtime.max(soc.core.mtimecmp);
                 // proc.sleep = true;
                 // let add_time = (proc.memory.csr_read(memory::Time::Mtimecmp) as i64
                 //     - proc.memory.csr_read(memory::Time::Mtime) as i64)
@@ -88,7 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             last_time = SystemTime::now();
             soc.core.mtime += time_diff;
         } else {
-            soc.core.mtime += 50;
+            soc.clint.mtime += 50;
         }
 
         soc.core.lr_address = 0x0;

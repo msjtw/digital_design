@@ -26,9 +26,6 @@ pub struct Core {
     reg_file: [i32; 32],
     pub csr_file: [u32; 4096],
 
-    pub mtime: u64,
-    pub mtimecmp: u64,
-
     trap: u32,
     pub trap_val: u32,
     pub lr_address: u32,
@@ -47,9 +44,6 @@ impl Default for Core {
             pc: 0,
             reg_file: [0; 32],
             csr_file: [0; 4096],
-
-            mtime: 0,
-            mtimecmp: 0,
 
             trap: TRAP_CLEAR,
             trap_val: 0,
@@ -304,25 +298,19 @@ pub fn read_data(
 }
 
 pub fn run(soc: &mut SoC, max_cycles: u32) -> State {
-    {
-        let core = &mut soc.core;
+    soc.uart.tick(soc.plic);
+    soc.clint.tick(soc.core);
+    soc.plic.tick(soc.core);
 
-        soc.uart.tick(soc.plic);
-        soc.plic.tick(core);
-
-        let mut mip = csr::read(Csr::mip, core);
-        if core.mtime >= core.mtimecmp {
-            mip |= 0b10000000;
-            core.wfi = false;
-        } else {
-            mip &= !0b10000000;
-        }
-        csr::write(Csr::mip, mip, core);
-
-        if core.wfi {
-            return State::Sleep;
-        }
+    let mip = csr::read(Csr::mip, soc.core);
+    if mip > 0 {
+        soc.core.wfi = false;
     }
+
+    if soc.core.wfi {
+        return State::Sleep;
+    }
+
     match tick(soc, max_cycles) {
         Ok(State::Ok) => {}
         Ok(x) => {
@@ -374,7 +362,7 @@ fn tick(soc: &mut SoC, max_cycles: u32) -> Result<State, ()> {
         curr_cycle += 1;
 
         if super::DEBUG {
-            if (soc.core.pc == 0x80400094 
+            if (soc.core.pc == 0x80400094
                 || csr::read_64(Csr64::mcycle, soc.core) > super::PRINT_START)
                 && !soc.core.p_start
             {
@@ -383,7 +371,7 @@ fn tick(soc: &mut SoC, max_cycles: u32) -> Result<State, ()> {
             }
 
             if soc.core.pc == 0x80400094 {
-                soc.core.mtime = 0xc9f4;
+                // soc.core.mtime = 0xc9f4;
             }
         }
 
