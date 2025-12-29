@@ -21,7 +21,6 @@ struct SoC<'a> {
     memory: &'a mut memory::Memory,
     uart: &'a mut device::ns16550::Uart,
     plic: &'a mut device::plic::Plic,
-    clint: &'a mut device::clint::Clint,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -44,7 +43,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         memory: &mut memory,
         uart: &mut uart,
         plic: &mut plic,
-        clint: &mut clint,
     };
     // let mut memory = memory::Memory::default();
     // let mut proc = core::Core::new(&mut memory);
@@ -91,7 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             last_time = SystemTime::now();
             soc.core.mtime += time_diff;
         } else {
-            soc.clint.mtime += 50;
+            soc.core.mtime += 50;
         }
 
         soc.core.lr_address = 0x0;

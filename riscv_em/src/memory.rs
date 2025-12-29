@@ -216,10 +216,22 @@ pub fn phys_read_word(addr: u32, soc: &mut SoC) -> Result<u32, exceptions::Excep
     if addr < memory.base_addr {
         if soc.plic.claim(addr) {
             return Ok(soc.plic.read(addr));
-        } else if soc.clint.claim(addr) {
-            return Ok(soc.clint.read(addr));
         } else {
-            return Ok(0);
+            return match addr {
+                0x200bffc => {
+                    if soc.core.p_start {
+                        eprintln!("mtime change 0x{:x}", soc.core.mtime);
+                    }
+                    Ok((soc.core.mtime >> 32) as u32)
+                }
+                0x200bff8 => {
+                    if soc.core.p_start {
+                        eprintln!("mtime change 0x{:x}", soc.core.mtime);
+                    }
+                    Ok(soc.core.mtime as u32)
+                }
+                _ => Ok(0),
+            };
         }
     }
     let address = (addr - memory.base_addr) as usize;
@@ -300,8 +312,30 @@ pub fn phys_write_word(addr: u32, data: u32, soc: &mut SoC) -> Result<u32, excep
     if addr < memory.base_addr {
         if soc.plic.claim(addr) {
             soc.plic.write(addr, data);
-        } else if soc.clint.claim(addr) {
-            soc.clint.write(addr, data);
+        } else {
+            match addr {
+                // syscon
+                0x11100000 => {
+                    return Ok(data);
+                }
+                0x2004004 => {
+                    if soc.core.p_start {
+                        eprintln!("mtime change 0x{:x}", soc.core.mtime);
+                    }
+                    let mtimecmpl = soc.core.mtimecmp as u32;
+                    soc.core.mtimecmp = ((data as u64) << 32) + mtimecmpl as u64;
+                }
+                0x2004000 => {
+                    if soc.core.p_start {
+                        eprintln!("mtime change 0x{:x}", soc.core.mtime);
+                    }
+                    let mtimecmph = (soc.core.mtimecmp >> 32) as u32;
+                    soc.core.mtimecmp = ((mtimecmph as u64) << 32) + data as u64;
+                }
+                _ => {
+                    // println!("10 Error! write:0x{:x}", addr);
+                }
+            };
         }
         return Ok(0);
     }
@@ -351,6 +385,13 @@ pub fn phys_write_byte(addr: u32, data: u8, soc: &mut SoC) -> Result<(), excepti
     if addr < memory.base_addr {
         if soc.uart.claim(addr) {
             soc.uart.write(addr, data);
+        } else {
+            match addr {
+                0x11100000 => {} // TODO: SYSCON;
+                _ => {
+                    // println!("14 Error! write:0x{:x}", addr);
+                }
+            };
         }
 
         return Ok(());

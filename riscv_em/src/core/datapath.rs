@@ -183,7 +183,6 @@ pub fn exec_r(soc: &mut SoC, instr: &RType) -> Result<State, Exception> {
                     memory: soc.memory,
                     uart: soc.uart,
                     plic: soc.plic,
-                    clint: soc.clint,
                 },
             ) {
                 Ok(x) => rd = x as i32,
@@ -270,7 +269,6 @@ pub fn exec_r(soc: &mut SoC, instr: &RType) -> Result<State, Exception> {
                         memory: soc.memory,
                         uart: soc.uart,
                         plic: soc.plic,
-                        clint: soc.clint,
                     },
                 )?;
             }
@@ -384,7 +382,6 @@ pub fn exec_i(soc: &mut SoC, instr: &IType) -> Result<State, Exception> {
                 memory: soc.memory,
                 uart: soc.uart,
                 plic: soc.plic,
-                clint: soc.clint,
             };
             match instr.funct3 {
                 // lb sign-extended
