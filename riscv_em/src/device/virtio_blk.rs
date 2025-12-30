@@ -1,50 +1,117 @@
 #![allow(non_camel_case_types)]
-use crate::{SoC, core::exceptions};
 
-use super::virtio::*;
+use crate::{
+    SoC,
+    memory::{phys_read_byte, phys_read_hword, phys_read_word, phys_write_byte},
+};
 
-struct VirtioBlk {
-    vmmio: VirtioMmio<2>,
-    config: Box<virtio_blk_config>,
+use super::virtio::{registers::*, *};
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::{Read, Seek, SeekFrom, Write};
+
+const VIRTIO_BLK_T_IN: u32 = 0;
+const VIRTIO_BLK_T_OUT: u32 = 1;
+
+const VIRTIO_BLK_S_OK: u8 = 0;
+const VIRTIO_BLK_S_IOERR: u8 = 1;
+const VIRTIO_BLK_S_UNSUPP: u8 = 2;
+
+pub struct VirtioBlk {
+    pub config: virtio_blk_config,
+    pub config_size: u32,
+    pub drive: File,
 }
 
 impl Default for VirtioBlk {
     fn default() -> Self {
-        let mut config = Box::new(virtio_blk_config::default());
+        let drive = match OpenOptions::new().read(true).write(true).open("disk_file") {
+            Ok(file) => file,
+            Err(err) => panic!("disk file error: {:?}", err),
+        };
         VirtioBlk {
-            vmmio: VirtioMmio::<2> {
-                base: 0x4200000,
-                length: 0x200,
-                interrupt_id: 3,
-
-                device_id: 2,
-
-                device_features: [0; 2],
-                device_features_sel: 0,
-                driver_features: [0; 2],
-                driver_features_sel: 0,
-
-                queue_sel: 0,
-                queues: [VirtioQueue::default(); 2],
-                queue_notify: 0,
-                queue_notify_pending: false,
-
-                interrupt_status: 0,
-                interrupt_ack: 0,
-                status: 0,
-                config_generation: 0,
-                config: std::ptr::NonNull::from(&mut *config),
-                config_size: 8,
-
-                chain_process_function: blk_process_chain,
-            },
-            config,
+            config: virtio_blk_config::default(),
+            config_size: size_of::<virtio_blk_config>() as u32,
+            drive,
         }
     }
 }
+impl VirtioDev for VirtioBlk {
+    // add code here
+    fn process_chain(
+        &mut self,
+        queue: &mut VirtioQueue,
+        head_idx: u16,
+        soc: &mut SoC,
+    ) -> Result<u32, ()> {
+        // Blk request is divided into data fields of 3 descriptors:
+        // first (length 4):
+        //     le32 type
+        //     le32 reserved
+        //     le64 sector
+        // second (desc.len field is length of data):
+        //     u8 data[]
+        // third (length 1):
+        //     u8 status
+        // This is not directly specified in virtio specification.
+        //
 
-fn blk_process_chain(head_idx: u16, soc: &mut SoC) -> Result<u32, exceptions::Exception> {
-    Ok(0)
+        let head_addr = queue.queue_desc_low + 16 * head_idx as u32;
+        let head_desc = Descriptor::read(head_addr, soc);
+        if head_desc.flags & VIRTQ_DESC_F_NEXT == 0 {
+            return Err(());
+        }
+        let data_addr = queue.queue_desc_low + 16 * head_desc.next as u32;
+        let data_desc = Descriptor::read(data_addr, soc);
+        if data_desc.flags & VIRTQ_DESC_F_NEXT == 0 {
+            return Err(());
+        }
+        let status_addr = queue.queue_desc_low + 16 * data_desc.next as u32;
+        let status_desc = Descriptor::read(status_addr, soc);
+        if data_desc.flags & VIRTQ_DESC_F_NEXT != 0 {
+            return Err(());
+        }
+
+        let op_type = phys_read_word(head_desc.addr as u32, soc).map_err(|_| ())?;
+        // skip reserved
+        let sector = phys_read_word(head_desc.addr as u32, soc).map_err(|_| ())? as u64;
+
+        // FIX: Add check if sector in range. Write VIRTIO_BLK_S_IOERR to status.
+
+        match op_type {
+            VIRTIO_BLK_T_IN => {
+                // read
+                let mut buf = Vec::<u8>::with_capacity(data_desc.len as usize);
+                self.drive
+                    .seek(SeekFrom::Start(sector * 512))
+                    .map_err(|_| ())?;
+                self.drive.read_exact(&mut buf).map_err(|_| ())?;
+                for i in 0..(data_desc.len as usize) {
+                    phys_write_byte(data_desc.addr as u32 + i as u32, buf[i], soc).map_err(|_| ())?;
+                }
+            }
+            VIRTIO_BLK_T_OUT => {
+                // write
+                let mut buf = Vec::<u8>::with_capacity(data_desc.len as usize);
+                for i in 0..(data_desc.len as usize) {
+                    buf[i] =
+                        phys_read_byte(data_desc.addr as u32 + i as u32, soc).map_err(|_| ())?;
+                }
+                self.drive
+                    .seek(SeekFrom::Start(sector * 512))
+                    .map_err(|_| ())?;
+                self.drive.write_all(&mut buf).map_err(|_| ())?;
+            }
+            _ => {
+                // unsuported or not valid
+                phys_write_byte(status_desc.addr as u32, VIRTIO_BLK_S_UNSUPP, soc)
+                    .map_err(|_| ())?;
+                return Err(());
+            }
+        }
+
+        return Ok(data_desc.len);
+    }
 }
 
 #[derive(Default)]
@@ -72,7 +139,7 @@ pub struct virtio_blk_config {
     zoned: virtio_blk_zoned_characteristics,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 #[repr(C, packed)]
 struct virtio_blk_geometry {
     cylinders: u16,
@@ -80,7 +147,7 @@ struct virtio_blk_geometry {
     sectors: u8,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 #[repr(C, packed)]
 struct virtio_blk_topology {
     // # of logical blocks per physical block (log2)
@@ -93,7 +160,7 @@ struct virtio_blk_topology {
     opt_io_size: u32,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 #[repr(C, packed)]
 struct virtio_blk_zoned_characteristics {
     zone_sectors: u32,

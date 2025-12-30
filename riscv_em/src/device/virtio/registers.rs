@@ -1,10 +1,8 @@
 #![allow(non_upper_case_globals)]
 
-#[derive(Debug)]
-enum RW {
-    R,
-    W,
-}
+pub const VIRTQ_DESC_F_NEXT: u16 =1;
+pub const VIRTQ_DESC_F_WRITE: u16 = 2;
+pub const VIRTQ_DESC_F_INDIRECT: u16 = 4;
 
 pub const _MagicValue: u32 = 0x000;
 pub const _Version: u32 = 0x004;

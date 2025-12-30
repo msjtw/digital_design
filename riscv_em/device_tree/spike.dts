@@ -64,6 +64,12 @@
       reg-shift = <0x0>;
       reg-io-width = <0x1>;
     };
+    blk0: virtio@4200000 {
+        compatible = "virtio,mmio";
+        reg = <0x0 0x4200000 0x0 0x200>;
+        interrupt-parent = <&PLIC>;
+        interrupts = <3>;
+    };
   };
   htif {
     compatible = "ucb,htif0";
