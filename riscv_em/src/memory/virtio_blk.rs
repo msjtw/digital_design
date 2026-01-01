@@ -1,11 +1,13 @@
 #![allow(non_camel_case_types)]
 
-use crate::memory::*;
+use crate::memory::ram::RAM;
 
 use super::virtio::{registers::*, *};
+use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::os::linux::fs::MetadataExt;
 
 const VIRTIO_BLK_T_IN: u32 = 0;
 const VIRTIO_BLK_T_OUT: u32 = 1;
@@ -13,6 +15,8 @@ const VIRTIO_BLK_T_OUT: u32 = 1;
 const VIRTIO_BLK_S_OK: u8 = 0;
 const VIRTIO_BLK_S_IOERR: u8 = 1;
 const VIRTIO_BLK_S_UNSUPP: u8 = 2;
+
+const DISK_BLK_SIZE: u64 = 512;
 
 pub struct VirtioBlk {
     pub config: virtio_blk_config,
@@ -26,8 +30,14 @@ impl Default for VirtioBlk {
             Ok(file) => file,
             Err(err) => panic!("disk file error: {:?}", err),
         };
+        let meta = match fs::metadata("disk_file") {
+            Ok(meta) => meta,
+            Err(err) => panic!("disk file error: {:?}", err),
+        };
+        let mut config = virtio_blk_config::default();
+        config.capacity = ((meta.st_size() - 1) / DISK_BLK_SIZE) + 1;
         VirtioBlk {
-            config: virtio_blk_config::default(),
+            config,
             config_size: size_of::<virtio_blk_config>() as u32,
             drive,
         }
@@ -55,21 +65,22 @@ impl VirtioDev for VirtioBlk {
 
         let head_addr = queue.queue_desc_low + 16 * head_idx as u32;
         let head_desc = Descriptor::read(head_addr, ram);
+        let op_type = ram.load_word(head_desc.addr as u32);
+
         if head_desc.flags & VIRTQ_DESC_F_NEXT == 0 {
             return Err(());
         }
-        let data_addr = queue.queue_desc_low + 16 * head_desc.next as u32;
+        let data_addr = queue.queue_desc_low + (16 * head_desc.next as u32);
         let data_desc = Descriptor::read(data_addr, ram);
         if data_desc.flags & VIRTQ_DESC_F_NEXT == 0 {
             return Err(());
         }
-        let status_addr = queue.queue_desc_low + 16 * data_desc.next as u32;
+        let status_addr = queue.queue_desc_low + (16 * data_desc.next as u32);
         let status_desc = Descriptor::read(status_addr, ram);
-        if data_desc.flags & VIRTQ_DESC_F_NEXT != 0 {
+        if status_desc.flags & VIRTQ_DESC_F_NEXT != 0 {
             return Err(());
         }
 
-        let op_type = ram.load_word(head_desc.addr as u32);
         // skip reserved
         let sector = ram.load_word(head_desc.addr as u32 + 8) as u64;
 
@@ -78,25 +89,25 @@ impl VirtioDev for VirtioBlk {
         match op_type {
             VIRTIO_BLK_T_IN => {
                 // read
-                let mut buf = Vec::<u8>::with_capacity(data_desc.len as usize);
+                let mut buf = vec![0u8; data_desc.len as usize];
                 self.drive
                     .seek(SeekFrom::Start(sector * 512))
                     .map_err(|_| ())?;
-                self.drive.read_exact(&mut buf).map_err(|_| ())?;
+                self.drive.read(&mut buf).map_err(|_| ())?;
                 for i in 0..(data_desc.len as usize) {
                     ram.store_byte(data_desc.addr as u32 + i as u32, buf[i]);
                 }
             }
             VIRTIO_BLK_T_OUT => {
                 // write
-                let mut buf = Vec::<u8>::with_capacity(data_desc.len as usize);
+                let mut buf = vec![0u8; data_desc.len as usize];
                 for i in 0..(data_desc.len as usize) {
                     buf[i] = ram.load_byte(data_desc.addr as u32 + i as u32);
                 }
                 self.drive
                     .seek(SeekFrom::Start(sector * 512))
                     .map_err(|_| ())?;
-                self.drive.write_all(&mut buf).map_err(|_| ())?;
+                self.drive.write(&mut buf).map_err(|_| ())?;
             }
             _ => {
                 // unsuported or not valid
@@ -112,7 +123,7 @@ impl VirtioDev for VirtioBlk {
 #[derive(Default)]
 #[repr(C, packed)]
 pub struct virtio_blk_config {
-    capacity: u64,
+    pub capacity: u64,
     size_max: u32,
     seg_max: u32,
     geometry: virtio_blk_geometry,

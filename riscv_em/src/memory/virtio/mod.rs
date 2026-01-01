@@ -23,7 +23,7 @@ impl Descriptor {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct VirtioQueue {
     queue_size_max: u16,
     pub queue_size: u16,
@@ -36,6 +36,21 @@ pub struct VirtioQueue {
     // shared memory registers ...
     queue_reset: u32,
     pub last_avail: u16,
+}
+
+impl Default for VirtioQueue {
+    fn default() -> Self {
+        VirtioQueue {
+            queue_size_max: 1024,
+            queue_size: 0,
+            queue_ready: 0,
+            queue_desc_low: 0,
+            queue_driver_low: 0,
+            queue_device_low: 0,
+            queue_reset: 0,
+            last_avail: 0,
+        }
+    }
 }
 
 pub struct VirtioMmio<const QCOUNT: usize> {
@@ -108,6 +123,7 @@ impl VirtioDevice {
         }
 
         if self.mmio.status & STATUS_NEEDS_RESET > 0 {
+            self.reset();
             return;
         }
 
@@ -169,12 +185,15 @@ impl VirtioDevice {
             _QueueDescLow => {
                 self.mmio.queues[self.mmio.queue_sel].queue_desc_low = data;
             }
+            _QueueDescHigh => {},
             _QueueDriverLow => {
                 self.mmio.queues[self.mmio.queue_sel].queue_driver_low = data;
             }
+            _QueueDriverHigh => {},
             _QueueDeviceLow => {
                 self.mmio.queues[self.mmio.queue_sel].queue_device_low = data;
             }
+            _QueueDeviceHigh => {},
             _QueueReset => {
                 self.mmio.queues[self.mmio.queue_sel].queue_reset = data;
             }
@@ -193,7 +212,7 @@ impl VirtioDevice {
 
     pub fn read(&mut self, addr: u32) -> u32 {
         let addr = addr - self.mmio.base;
-        return match addr {
+        let val = match addr {
             _MagicValue => 0x74726976,
             _Version => 0x2,
             _DeviceID => self.mmio.device_id,
@@ -214,6 +233,7 @@ impl VirtioDevice {
                 }
             }
         };
+        val
     }
 
     fn set_fail(&mut self) {
@@ -224,7 +244,7 @@ impl VirtioDevice {
     }
 
     fn reset(&mut self) {
-        // TODO:
+        *self = VirtioDevice::default();
     }
 
     fn handle_notify(&mut self, ram: &mut RAM) -> Result<(), ()> {
