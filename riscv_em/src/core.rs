@@ -323,7 +323,7 @@ pub fn hart_run(hart: &mut Hart, bus: &mut MemoryBus, max_cycles: u32) -> State 
     // TODO: devices tick
     hart.clint.tick(&mut hart.core);
     bus.uart.tick(&mut bus.plic);
-    // bus.blk.tick(&);
+    bus.blk.tick(&mut bus.plic, &mut bus.ram);
     bus.plic.tick(&mut hart.core);
 
     if hart.core.wfi {
@@ -338,10 +338,10 @@ pub fn hart_run(hart: &mut Hart, bus: &mut MemoryBus, max_cycles: u32) -> State 
         Err(_) => {
             if hart.core.trap != TRAP_CLEAR {
                 // if core.trap == 0x80000009 {
-                eprintln!(
-                    "it's a trap 0x{:x} trap_val 0x{:x}; mtime 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}",
-                    hart.core.trap, hart.core.trap_val, hart.clint.mtime, hart.core.mode, hart.core.pc, hart.core.instr_fetch
-                );
+                // eprintln!(
+                //     "it's a trap 0x{:x} trap_val 0x{:x}; mtime 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}",
+                //     hart.core.trap, hart.core.trap_val, hart.clint.mtime, hart.core.mode, hart.core.pc, hart.core.instr_fetch
+                // );
                 // }
                 if hart.core.trap == 2 {
                     hart.core.trap_val = hart.core.instr_fetch;

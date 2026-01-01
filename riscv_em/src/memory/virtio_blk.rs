@@ -39,7 +39,7 @@ impl VirtioDev for VirtioBlk {
         &mut self,
         queue: &mut VirtioQueue,
         head_idx: u16,
-        bus: &mut MemoryBus,
+        ram: &mut RAM,
     ) -> Result<u32, ()> {
         // Blk request is divided into data fields of 3 descriptors:
         // first (length 4):
@@ -54,24 +54,24 @@ impl VirtioDev for VirtioBlk {
         //
 
         let head_addr = queue.queue_desc_low + 16 * head_idx as u32;
-        let head_desc = Descriptor::read(head_addr, bus);
+        let head_desc = Descriptor::read(head_addr, ram);
         if head_desc.flags & VIRTQ_DESC_F_NEXT == 0 {
             return Err(());
         }
         let data_addr = queue.queue_desc_low + 16 * head_desc.next as u32;
-        let data_desc = Descriptor::read(data_addr, bus);
+        let data_desc = Descriptor::read(data_addr, ram);
         if data_desc.flags & VIRTQ_DESC_F_NEXT == 0 {
             return Err(());
         }
         let status_addr = queue.queue_desc_low + 16 * data_desc.next as u32;
-        let status_desc = Descriptor::read(status_addr, bus);
+        let status_desc = Descriptor::read(status_addr, ram);
         if data_desc.flags & VIRTQ_DESC_F_NEXT != 0 {
             return Err(());
         }
 
-        let op_type = load_word(bus, head_desc.addr as u32).map_err(|_| ())?;
+        let op_type = ram.load_word(head_desc.addr as u32);
         // skip reserved
-        let sector = load_word(bus, head_desc.addr as u32).map_err(|_| ())? as u64;
+        let sector = ram.load_word(head_desc.addr as u32 + 8) as u64;
 
         // FIX: Add check if sector in range. Write VIRTIO_BLK_S_IOERR to status.
 
@@ -84,14 +84,14 @@ impl VirtioDev for VirtioBlk {
                     .map_err(|_| ())?;
                 self.drive.read_exact(&mut buf).map_err(|_| ())?;
                 for i in 0..(data_desc.len as usize) {
-                    store_byte(bus, data_desc.addr as u32 + i as u32, buf[i]).map_err(|_| ())?;
+                    ram.store_byte(data_desc.addr as u32 + i as u32, buf[i]);
                 }
             }
             VIRTIO_BLK_T_OUT => {
                 // write
                 let mut buf = Vec::<u8>::with_capacity(data_desc.len as usize);
                 for i in 0..(data_desc.len as usize) {
-                    buf[i] = load_byte(bus, data_desc.addr as u32 + i as u32).map_err(|_| ())?;
+                    buf[i] = ram.load_byte(data_desc.addr as u32 + i as u32);
                 }
                 self.drive
                     .seek(SeekFrom::Start(sector * 512))
@@ -100,7 +100,7 @@ impl VirtioDev for VirtioBlk {
             }
             _ => {
                 // unsuported or not valid
-                store_byte(bus, status_desc.addr as u32, VIRTIO_BLK_S_UNSUPP).map_err(|_| ())?;
+                ram.store_byte(status_desc.addr as u32, VIRTIO_BLK_S_UNSUPP);
                 return Err(());
             }
         }

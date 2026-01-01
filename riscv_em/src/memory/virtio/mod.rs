@@ -13,12 +13,12 @@ pub struct Descriptor {
 }
 
 impl Descriptor {
-    pub fn read(addr: u32, bus: &mut MemoryBus) -> Self {
+    pub fn read(addr: u32, ram: &mut RAM) -> Self {
         Self {
-            addr: load_word(bus, addr).unwrap() as u64,
-            len: load_word(bus, addr + 4).unwrap(),
-            flags: load_hword(bus, addr + 12).unwrap(),
-            next: load_hword(bus, addr + 14).unwrap(),
+            addr: ram.load_word(addr) as u64,
+            len: ram.load_word(addr + 8),
+            flags: ram.load_hword(addr + 12),
+            next: ram.load_hword(addr + 14),
         }
     }
 }
@@ -74,7 +74,7 @@ impl Default for VirtioDevice {
                 length: 0x200,
                 interrupt_id: 3,
                 device_id: 2,
-                device_features: [0; 2],
+                device_features: [0, 1],
                 device_features_sel: 0,
                 driver_features: [0; 2],
                 driver_features_sel: 0,
@@ -100,11 +100,11 @@ impl VirtioDevice {
         return false;
     }
 
-    pub fn tick(&mut self, bus: &mut MemoryBus) {
+    pub fn tick(&mut self, plic: &mut Plic, ram: &mut RAM) {
         if self.mmio.interrupt_status > 0 {
-            bus.plic.intt_active |= 1 << self.mmio.interrupt_id;
+            plic.intt_active |= 1 << self.mmio.interrupt_id;
         } else {
-            bus.plic.intt_active &= !(1 << self.mmio.interrupt_id);
+            plic.intt_active &= !(1 << self.mmio.interrupt_id);
         }
 
         if self.mmio.status & STATUS_NEEDS_RESET > 0 {
@@ -113,7 +113,7 @@ impl VirtioDevice {
 
         if self.mmio.queue_notify_pending {
             self.mmio.queue_notify_pending = false;
-            match self.handle_notify(bus) {
+            match self.handle_notify(ram) {
                 Ok(_) => {}
                 Err(_) => {
                     self.set_fail();
@@ -227,24 +227,21 @@ impl VirtioDevice {
         // TODO:
     }
 
-    fn handle_notify(&mut self, bus: &mut MemoryBus) -> Result<(), ()> {
+    fn handle_notify(&mut self, ram: &mut RAM) -> Result<(), ()> {
         // there is index to read in avaliable ring
         let queue = &mut self.mmio.queues[self.mmio.queue_notify as usize];
-        let avail_idx = load_hword(bus, queue.queue_driver_low + 2).map_err(|_| ())?; // one behind index of last written entry
-        let mut used_idx = load_hword(bus, queue.queue_device_low + 2).map_err(|_| ())?;
+        let avail_idx = ram.load_hword(queue.queue_driver_low + 2); // one behind index of last written entry
+        let mut used_idx = ram.load_hword(queue.queue_device_low + 2);
         while queue.last_avail != avail_idx {
             // while not all descriptor chain heads had been read
             let avail_queue_idx = queue.last_avail % queue.queue_size; // ring index of last unread head
-            let head_idx = load_hword(
-                bus,
-                // index of chain head in avail ring
-                queue.queue_driver_low + 4 + (2 * avail_queue_idx as u32), // 4 bytes in the available ring are for flags and idx
-            )
-            .map_err(|_| ())?;
+            // index of chain head in avail ring
+            let head_idx =
+                ram.load_hword(queue.queue_driver_low + 4 + (2 * avail_queue_idx as u32)); // 4 bytes in the available ring are for flags and idx
 
             // TODO: process chain
             let nbytes;
-            match self.device.process_chain(queue, head_idx, bus) {
+            match self.device.process_chain(queue, head_idx, ram) {
                 Ok(len) => nbytes = len,
                 Err(_) => {
                     self.set_fail();
@@ -254,20 +251,20 @@ impl VirtioDevice {
 
             let used_queue_idx = used_idx % queue.queue_size; // ring index of last unread head
             let used_ring_addr = queue.queue_driver_low + 4 + (8 * used_queue_idx as u32);
-            store_word(bus, used_ring_addr, head_idx as u32).map_err(|_| ())?;
-            store_word(bus, used_ring_addr + 4, nbytes).map_err(|_| ())?;
+            ram.store_word(used_ring_addr, head_idx as u32);
+            ram.store_word(used_ring_addr + 4, nbytes);
 
             queue.last_avail += 1;
             used_idx += 1;
         }
 
         // flags field of used ring needs to be 0
-        store_hword(bus, queue.queue_device_low, 0).map_err(|_| ())?;
+        ram.store_hword(queue.queue_device_low, 0);
         // write new idx to used ring
-        store_hword(bus, queue.queue_device_low + 2, used_idx).map_err(|_| ())?;
+        ram.store_hword(queue.queue_device_low + 2, used_idx);
 
         // INTERRUPT
-        let used_ring_flags = load_hword(bus, queue.queue_device_low).map_err(|_| ())?;
+        let used_ring_flags = ram.load_hword(queue.queue_device_low);
         if used_ring_flags != 1 {
             // If flags is 1, the device SHOULD NOT send a notification
             self.mmio.interrupt_status |= INT_UsedBufferNotification;
@@ -282,7 +279,7 @@ pub trait VirtioDev {
         &mut self,
         queue: &mut VirtioQueue,
         head_idx: u16,
-        bus: &mut MemoryBus,
+        ram: &mut RAM,
     ) -> Result<u32, ()>;
 }
 
