@@ -2,9 +2,12 @@ pub mod csr;
 mod datapath;
 pub mod exceptions;
 mod instr_parse;
+mod virt_memory;
 
-use super::SoC;
-use crate::memory::{self};
+use crate::{
+    core::csr::conuters_mirror,
+    memory::{clint::Clint, *},
+};
 use csr::{Csr, Csr64};
 use exceptions::*;
 use instr_parse::Instruction;
@@ -16,25 +19,27 @@ const TRAP_CLEAR: u32 = u32::MAX;
 pub enum State {
     Ok,
     Sleep,
-    Reboot,
-    Shutdown,
+    // Reboot,
+    // Shutdown,
 }
 
-// #[derive(Debug)]
+pub struct Hart {
+    pub core: Core,
+    pub clint: Clint,
+}
+
+#[derive(Debug)]
 pub struct Core {
     pub pc: u32,
     reg_file: [i32; 32],
     pub csr_file: [u32; 4096],
-
-    pub mtime: u64,
-    pub mtimecmp: u64,
 
     trap: u32,
     pub trap_val: u32,
     pub lr_address: u32,
     lr_set: i32,
     pub mode: u32,
-    wfi: bool, // wait for interrupt
+    pub wfi: bool, // wait for interrupt
 
     instr_fetch: u32,
     pub instr_str: String,
@@ -47,9 +52,6 @@ impl Default for Core {
             pc: 0,
             reg_file: [0; 32],
             csr_file: [0; 4096],
-
-            mtime: 0,
-            mtimecmp: 0,
 
             trap: TRAP_CLEAR,
             trap_val: 0,
@@ -262,97 +264,103 @@ impl Core {
     }
 }
 
-pub fn read_data(
-    soc: &mut SoC,
+pub fn soc_init(
+    hart: &mut Hart,
+    bus: &mut MemoryBus,
     kernel: &str,
     dtb: &str,
 ) -> Result<(), Box<dyn std::error::Error + 'static>> {
-    soc.core.mode = 3;
+    hart.core.mode = 3;
 
     // kernel
     let data = fs::read(kernel)?;
     for i in 0..data.len() {
-        let _ = memory::write_byte(super::RAM_OFFSET + i as u32, data[i], soc);
+        let _ = virt_memory::virt_write_byte(super::RAM_OFFSET + i as u32, data[i], hart, bus);
     }
 
     //8 byte alligned DTB
+    let data = fs::read(dtb)?;
     let mut dtb_addr = super::RAM_OFFSET + super::RAM_SIZE as u32 - data.len() as u32;
     dtb_addr >>= 3;
     dtb_addr <<= 3;
-    let data = fs::read(dtb)?;
+    println!("dtb addr 0x{:08x}", dtb_addr);
     for i in 0..data.len() {
-        let _ = memory::write_byte(dtb_addr + i as u32, data[i], soc);
+        let _ = virt_memory::virt_write_byte(dtb_addr + i as u32, data[i], hart, bus);
         // self.dtb.push(data[i]);
     }
     // while self.dtb.len() % 4 != 0 {
     //     self.dtb.push(0);
     // }
 
-    soc.core.pc = 0x80000000;
-    soc.core.reg_file[5] = 0x00001000u32 as i32;
-    soc.core.reg_file[10] = 0x00; // hart ID
-    soc.core.reg_file[11] = dtb_addr as i32;
-    soc.core.reg_file[12] = 0;
-    csr::write(Csr::misa, 0b01000000000101000001000100000001, soc.core);
+    hart.core.pc = 0x80000000;
+    hart.core.reg_file[5] = 0x00001000u32 as i32;
+    hart.core.reg_file[10] = 0x00; // hart ID
+    hart.core.reg_file[11] = dtb_addr as i32;
+    hart.core.reg_file[12] = 0;
+    csr::write(
+        Csr::misa,
+        0b01000000000101000001000100000001,
+        &mut hart.core,
+    );
     //                            zyxvwutsrqponmlkjihgfedcba
     //                            Spent a whole week looking for a problem,
     //                            ... I missed q in alphabet.
-    csr::write(Csr::menvcfgh, 0b00010000000000000000000000000000, soc.core);
-    csr::write(Csr::menvcfg, 0b00000000000000000000000000000000, soc.core);
-    csr::write(Csr::marchid, 0x5, soc.core);
+    csr::write(
+        Csr::menvcfgh,
+        0b00010000000000000000000000000000,
+        &mut hart.core,
+    );
+    csr::write(
+        Csr::menvcfg,
+        0b00000000000000000000000000000000,
+        &mut hart.core,
+    );
+    csr::write(Csr::marchid, 0x5, &mut hart.core);
     Ok(())
 }
 
-pub fn run(soc: &mut SoC, max_cycles: u32) -> State {
-    {
-        let core = &mut soc.core;
+pub fn hart_run(hart: &mut Hart, bus: &mut MemoryBus, max_cycles: u32) -> State {
+    // TODO: devices tick
+    hart.clint.tick(&mut hart.core);
+    bus.uart.tick(&mut bus.plic);
+    // bus.blk.tick(&);
+    bus.plic.tick(&mut hart.core);
 
-        soc.uart.tick(soc.plic);
-        soc.plic.tick(core);
-
-        let mut mip = csr::read(Csr::mip, core);
-        if core.mtime >= core.mtimecmp {
-            mip |= 0b10000000;
-            core.wfi = false;
-        } else {
-            mip &= !0b10000000;
-        }
-        csr::write(Csr::mip, mip, core);
-
-        if core.wfi {
-            return State::Sleep;
-        }
+    if hart.core.wfi {
+        return State::Sleep;
     }
-    match tick(soc, max_cycles) {
+
+    match tick(hart, bus, max_cycles) {
         Ok(State::Ok) => {}
         Ok(x) => {
             return x;
         }
         Err(_) => {
-            let core = &mut soc.core;
-            if core.trap != TRAP_CLEAR {
+            if hart.core.trap != TRAP_CLEAR {
                 // if core.trap == 0x80000009 {
-                // println!("it's a trap 0x{:x} trap_val 0x{:x}; mtime 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}", core.trap,
-                //    core.trap_val, core.mtime, core.mode, core.pc, core.instr_fetch);
+                eprintln!(
+                    "it's a trap 0x{:x} trap_val 0x{:x}; mtime 0x{:x}; mode:{}; instr *0x{:08x}=0x{:08x}",
+                    hart.core.trap, hart.core.trap_val, hart.clint.mtime, hart.core.mode, hart.core.pc, hart.core.instr_fetch
+                );
                 // }
-                if core.trap == 2 {
-                    core.trap_val = core.instr_fetch;
+                if hart.core.trap == 2 {
+                    hart.core.trap_val = hart.core.instr_fetch;
                 }
-                if (core.trap as i32) < 0 {
+                if (hart.core.trap as i32) < 0 {
                     //interrupt
-                    let mideleg = csr::read(Csr::mideleg, core);
-                    if (1 << (core.trap - 0x80000000)) & mideleg > 0 && core.mode < 3 {
-                        core.s_mode_trap_handler();
+                    let mideleg = csr::read(Csr::mideleg, &mut hart.core);
+                    if (1 << (hart.core.trap - 0x80000000)) & mideleg > 0 && hart.core.mode < 3 {
+                        hart.core.s_mode_trap_handler();
                     } else {
-                        core.m_mode_trap_handler();
+                        hart.core.m_mode_trap_handler();
                     }
                 } else {
                     // exception
-                    let medeleg = csr::read(Csr::medeleg, core);
-                    if (1 << core.trap) & medeleg > 0 && core.mode < 3 {
-                        core.s_mode_trap_handler();
+                    let medeleg = csr::read(Csr::medeleg, &mut hart.core);
+                    if (1 << hart.core.trap) & medeleg > 0 && hart.core.mode < 3 {
+                        hart.core.s_mode_trap_handler();
                     } else {
-                        core.m_mode_trap_handler();
+                        hart.core.m_mode_trap_handler();
                     }
                 }
             }
@@ -361,63 +369,65 @@ pub fn run(soc: &mut SoC, max_cycles: u32) -> State {
     State::Ok
 }
 
-fn tick(soc: &mut SoC, max_cycles: u32) -> Result<State, ()> {
+fn tick(hart: &mut Hart, bus: &mut MemoryBus, max_cycles: u32) -> Result<State, ()> {
     let mut curr_cycle = 0;
 
     while curr_cycle < max_cycles {
-        soc.core.check_interrupts();
-        if soc.core.trap != TRAP_CLEAR {
+        hart.core.check_interrupts();
+        csr::conuters_mirror(hart);
+
+        if hart.core.trap != TRAP_CLEAR {
             return Err(());
         }
 
-        soc.core.reg_file[0] = 0;
+        hart.core.reg_file[0] = 0;
         curr_cycle += 1;
 
         if super::DEBUG {
-            if (soc.core.pc == 0x80400094 
-                || csr::read_64(Csr64::mcycle, soc.core) > super::PRINT_START)
-                && !soc.core.p_start
+            if (hart.core.pc == 0x80400094
+                || csr::read_64(Csr64::mcycle, &hart.core) > super::PRINT_START)
+                && !hart.core.p_start
             {
                 println!("print start!");
-                soc.core.p_start = true;
+                hart.core.p_start = true;
             }
 
-            if soc.core.pc == 0x80400094 {
-                soc.core.mtime = 0xc9f4;
-            }
+            // if hart.core.pc == 0x80400094 {
+            //     clint.mtime = 0xc9f4;
+            // }
         }
 
-        if soc.core.pc & 0b11 > 0 {
+        if hart.core.pc & 0b11 > 0 {
             // check instruction address alignment
             // TODO: move this check to datapath
-            soc.core.trap = 0;
+            hart.core.trap = 0;
             return Err(());
         } else {
-            if (csr::read(Csr::mcountinhibit, soc.core) & 0b1) == 0 {
-                let cycle = csr::read_64(Csr64::mcycle, soc.core);
-                csr::write_64(Csr64::mcycle, cycle + 1, soc.core);
+            if (csr::read(Csr::mcountinhibit, &hart.core) & 0b1) == 0 {
+                let cycle = csr::read_64(Csr64::mcycle, &hart.core);
+                csr::write_64(Csr64::mcycle, cycle + 1, &mut hart.core);
             }
 
-            match memory::fetch_word(soc.core.pc, soc) {
+            match virt_memory::virt_fetch_word(hart.core.pc, hart, bus) {
                 Ok(fetch_result) => {
-                    soc.core.instr_fetch = fetch_result;
+                    hart.core.instr_fetch = fetch_result;
 
-                    if soc.core.p_start {
-                        soc.core.instr_str = format!(
+                    if hart.core.p_start {
+                        hart.core.instr_str = format!(
                             "core   0: {} 0x{:08x?} (0x{:08x?})\t",
-                            soc.core.mode, soc.core.pc, soc.core.instr_fetch
+                            hart.core.mode, hart.core.pc, hart.core.instr_fetch
                         );
                     }
 
                     match Instruction::from(fetch_result) {
                         Ok(instr) => {
                             let ret = match instr {
-                                Instruction::R(x) => datapath::exec_r(soc, &x),
-                                Instruction::I(x) => datapath::exec_i(soc, &x),
-                                Instruction::U(x) => datapath::exec_u(soc, &x),
-                                Instruction::J(x) => datapath::exec_j(soc, &x),
-                                Instruction::S(x) => datapath::exec_s(soc, &x),
-                                Instruction::B(x) => datapath::exec_b(soc, &x),
+                                Instruction::R(x) => datapath::exec_r(hart, bus, &x),
+                                Instruction::I(x) => datapath::exec_i(hart, bus, &x),
+                                Instruction::U(x) => datapath::exec_u(&mut hart.core, &x),
+                                Instruction::J(x) => datapath::exec_j(&mut hart.core, &x),
+                                Instruction::S(x) => datapath::exec_s(hart, bus, &x),
+                                Instruction::B(x) => datapath::exec_b(&mut hart.core, &x),
                             };
                             match ret {
                                 Ok(State::Ok) => {}
@@ -425,37 +435,37 @@ fn tick(soc: &mut SoC, max_cycles: u32) -> Result<State, ()> {
                                     return Ok(x);
                                 }
                                 Err(e) => {
-                                    soc.core.trap = exception_number(&e);
+                                    hart.core.trap = exception_number(&e);
                                     return Err(());
                                 }
                             };
                         }
                         Err(e) => {
-                            soc.core.trap = exception_number(&e);
+                            hart.core.trap = exception_number(&e);
                             return Err(());
                         }
                     };
                 }
                 Err(e) => {
-                    soc.core.trap = exception_number(&e);
+                    hart.core.trap = exception_number(&e);
                     return Err(());
                 }
             };
-            if (csr::read(Csr::mcountinhibit, soc.core) & 0b100) == 0 {
-                let minstret = csr::read_64(Csr64::minstret, soc.core);
-                csr::write_64(Csr64::minstret, minstret + 1, soc.core);
+            if (csr::read(Csr::mcountinhibit, &hart.core) & 0b100) == 0 {
+                let minstret = csr::read_64(Csr64::minstret, &hart.core);
+                csr::write_64(Csr64::minstret, minstret + 1, &mut hart.core);
             }
 
-            if soc.core.p_start {
-                if soc.core.instr_fetch != 0x00000073 {
+            if hart.core.p_start {
+                if hart.core.instr_fetch != 0x00000073 {
                     if !super::SPIKE_DEBUG {
                         print!(
-                            "core   0: {} 0x{:x?} (0x{:08x?})\t",
-                            soc.core.mode, soc.core.pc, soc.core.instr_fetch
+                            "hart.core   0: {} 0x{:x?} (0x{:08x?})\t",
+                            hart.core.mode, hart.core.pc, hart.core.instr_fetch
                         );
-                        eprintln!("0x{:08x?}: 0x{:08x?}", soc.core.pc, soc.core.instr_fetch);
+                        eprintln!("0x{:08x?}: 0x{:08x?}", hart.core.pc, hart.core.instr_fetch);
                     } else {
-                        eprintln!("{}", soc.core.instr_str);
+                        eprintln!("{}", hart.core.instr_str);
                     }
                 }
             }

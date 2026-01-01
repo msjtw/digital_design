@@ -1,3 +1,5 @@
+use crate::core::Hart;
+
 use super::{Core, exceptions::Exception};
 
 static LEGAL_ADRESSES: [u32; 61] = [
@@ -86,7 +88,6 @@ pub fn write_pmpXcfg(n: u32, data: u8, core: &mut Core) {
     csr &= !(0b11111111 << (n % 4) * 8);
     let data = u32::from(data) << (n % 4) * 8;
     core.csr_file[addr] = csr & data;
-    mirror(core);
 }
 
 pub fn read_addr(addr: u32, core: &Core) -> Result<u32, Exception> {
@@ -245,7 +246,6 @@ pub fn write_addr(addr: u32, data: u32, core: &mut Core) -> Result<(), Exception
             for laddr in LEGAL_ADRESSES {
                 if laddr == addr {
                     core.csr_file[addr as usize] = data;
-                    mirror(core);
                     return Ok(());
                 }
             }
@@ -323,20 +323,22 @@ pub fn write_64(csr: Csr64, data: u64, core: &mut Core) {
             core.csr_file[csr_addr(Csr::mstatush)] = (data >> 32) as u32;
         }
     };
-    mirror(core);
 }
 
-fn mirror(core: &mut Core) {
+pub fn conuters_mirror(hart: &mut Hart) {
     // timers
+    let time = hart.clint.mtime;
+    let timeh = hart.clint.mtimeh;
+    let core = &mut hart.core;
+
     let mcycle = core.csr_file[csr_addr(Csr::mcycle)];
     let mcycleh = core.csr_file[csr_addr(Csr::mcycleh)];
-    let time = core.mtime;
     let minstret = core.csr_file[csr_addr(Csr::minstret)];
     let minstreth = core.csr_file[csr_addr(Csr::minstreth)];
     core.csr_file[csr_addr(Csr::cycle)] = mcycle;
     core.csr_file[csr_addr(Csr::cycleh)] = mcycleh;
     core.csr_file[csr_addr(Csr::time)] = time as u32;
-    core.csr_file[csr_addr(Csr::timeh)] = (time >> 32) as u32;
+    core.csr_file[csr_addr(Csr::timeh)] = timeh as u32;
     core.csr_file[csr_addr(Csr::instret)] = minstret;
     core.csr_file[csr_addr(Csr::instreth)] = minstreth;
 
