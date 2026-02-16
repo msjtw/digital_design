@@ -78,11 +78,11 @@ pub struct VirtioMmio<const QCOUNT: usize> {
 
 pub struct VirtioDevice {
     pub mmio: VirtioMmio<1>,
-    pub device: VirtioBlk,
+    pub device: Box<dyn VirtioDev>,
 }
 
-impl Default for VirtioDevice {
-    fn default() -> Self {
+impl VirtioDevice {
+    pub fn new(dev: Box<dyn VirtioDev>) -> Self {
         VirtioDevice {
             mmio: VirtioMmio::<1> {
                 base: 0x4200000,
@@ -102,13 +102,14 @@ impl Default for VirtioDevice {
                 status: 0,
                 config_generation: 0,
             },
-            device: VirtioBlk::default(),
+            device: dev,
         }
     }
-}
 
-impl VirtioDevice {
     pub fn claim(&self, addr: u32) -> bool {
+        if self.device.get_conf_size() == 0 {
+            return false;
+        }
         if addr >= self.mmio.base && addr < self.mmio.base + self.mmio.length {
             return true;
         }
@@ -185,22 +186,22 @@ impl VirtioDevice {
             _QueueDescLow => {
                 self.mmio.queues[self.mmio.queue_sel].queue_desc_low = data;
             }
-            _QueueDescHigh => {},
+            _QueueDescHigh => {}
             _QueueDriverLow => {
                 self.mmio.queues[self.mmio.queue_sel].queue_driver_low = data;
             }
-            _QueueDriverHigh => {},
+            _QueueDriverHigh => {}
             _QueueDeviceLow => {
                 self.mmio.queues[self.mmio.queue_sel].queue_device_low = data;
             }
-            _QueueDeviceHigh => {},
+            _QueueDeviceHigh => {}
             _QueueReset => {
                 self.mmio.queues[self.mmio.queue_sel].queue_reset = data;
             }
             _ => {
-                if addr >= _Config && addr < _Config + self.device.config_size {
+                if addr >= _Config && addr < _Config + self.device.get_conf_size() {
                     self.device
-                        .config
+                        .get_config()
                         .write_word((addr - _Config) as usize, data);
                 } else {
                     // Error
@@ -224,8 +225,10 @@ impl VirtioDevice {
             _Status => self.mmio.status,
             _ConfigGeneration => self.mmio.config_generation,
             _ => {
-                if addr >= _Config && addr < _Config + self.device.config_size {
-                    self.device.config.read_word((addr - _Config) as usize)
+                if addr >= _Config && addr < _Config + self.device.get_conf_size() {
+                    self.device
+                        .get_config()
+                        .read_word((addr - _Config) as usize)
                 } else {
                     // Error
                     self.set_fail();
@@ -244,7 +247,24 @@ impl VirtioDevice {
     }
 
     fn reset(&mut self) {
-        *self = VirtioDevice::default();
+        self.mmio = VirtioMmio::<1> {
+            base: 0x4200000,
+            length: 0x200,
+            interrupt_id: 3,
+            device_id: 2,
+            device_features: [0, 1],
+            device_features_sel: 0,
+            driver_features: [0; 2],
+            driver_features_sel: 0,
+            queue_sel: 0,
+            queues: [VirtioQueue::default(); 1],
+            queue_notify: 0,
+            queue_notify_pending: false,
+            interrupt_status: 0,
+            interrupt_ack: 0,
+            status: 0,
+            config_generation: 0,
+        }
     }
 
     fn handle_notify(&mut self, ram: &mut RAM) -> Result<(), ()> {
@@ -295,6 +315,9 @@ impl VirtioDevice {
 }
 
 pub trait VirtioDev {
+    fn get_config(&mut self) -> &mut dyn VirtioConfig;
+    fn get_conf_size(&self) -> u32;
+
     fn process_chain(
         &mut self,
         queue: &mut VirtioQueue,
@@ -308,9 +331,9 @@ pub trait VirtioConfig {
         let base = self as *const _ as *const u8;
         unsafe {
             let d = *base.add(addr) as u32;
-            let c = *base.add(1) as u32;
-            let b = *base.add(2) as u32;
-            let a = *base.add(3) as u32;
+            let c = *base.add(addr+1) as u32;
+            let b = *base.add(addr+2) as u32;
+            let a = *base.add(addr+3) as u32;
             (a << 24) + (b << 16) + (c << 8) + d
         }
     }
@@ -323,9 +346,9 @@ pub trait VirtioConfig {
         let a: u8 = ((data & mask << 24) >> 24) as u8;
         unsafe {
             *base.add(addr) = d;
-            *base.add(1) = c;
-            *base.add(2) = b;
-            *base.add(3) = a;
+            *base.add(addr+1) = c;
+            *base.add(addr+2) = b;
+            *base.add(addr+3) = a;
         }
     }
 }

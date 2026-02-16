@@ -10,8 +10,8 @@ pub struct Uart {
     interrupt_id: usize,
 
     stdin: Bytes<termion::AsyncReader>,
-    stdout: RawTerminal<Stdout>,
-    // stdout: Stdout,
+    // stdout: RawTerminal<Stdout>,
+    stdout: Stdout,
     bytes_to_read: u8,
 
     dll: u8,
@@ -35,8 +35,8 @@ impl Default for Uart {
             length: 0x100,
             interrupt_id: 1,
             stdin: async_stdin().bytes(),
-            stdout: std::io::stdout().into_raw_mode().unwrap(),
-            // stdout: std::io::stdout(),
+            // stdout: std::io::stdout().into_raw_mode().unwrap(),
+            stdout: std::io::stdout(),
             bytes_to_read: 0,
             dll: 0,
             dlh: 0,
@@ -103,7 +103,7 @@ impl Uart {
                 if self.lcr & (1 << 7) != 0 {
                     self.dll = data;
                 } else {
-                    write!(self.stdout, "{}", data as char).unwrap();
+                    write!(self.stdout, "{}",data as char).unwrap();
                     self.stdout.flush().unwrap();
                     self.thr_interrupt = true;
                 }

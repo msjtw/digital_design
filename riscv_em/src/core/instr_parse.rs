@@ -255,9 +255,9 @@ impl Instruction {
             0b1101111 => Ok(Instruction::J(JType::from(byte_code))),
             0b0110111 | 0b0010111 => Ok(Instruction::U(UType::from(byte_code))),
             _ => {
-                println!("opcode: 0b{opcode:b}");
-                println!("0x{byte_code:x}");
-                // process::exit(1);
+                println!("\ropcode: 0b{opcode:b}");
+                println!("\r0x{byte_code:x}");
+                panic!();
                 Err(exceptions::Exception::Illegal_instruction)
             }
         }

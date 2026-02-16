@@ -3,7 +3,7 @@ pub mod ns16550;
 pub mod plic;
 pub mod ram;
 pub mod virtio;
-mod virtio_blk;
+pub mod virtio_blk;
 
 use crate::{
     core::exceptions,

@@ -21,11 +21,11 @@ const DISK_BLK_SIZE: u64 = 512;
 pub struct VirtioBlk {
     pub config: virtio_blk_config,
     pub config_size: u32,
-    pub drive: File,
+    pub drive: Option<File>,
 }
 
-impl Default for VirtioBlk {
-    fn default() -> Self {
+impl VirtioBlk {
+    pub fn init(&mut self) {
         let drive = match OpenOptions::new().read(true).write(true).open("disk_file") {
             Ok(file) => file,
             Err(err) => panic!("disk file error: {:?}", err),
@@ -34,17 +34,34 @@ impl Default for VirtioBlk {
             Ok(meta) => meta,
             Err(err) => panic!("disk file error: {:?}", err),
         };
+        self.config = virtio_blk_config::default();
+        self.config.capacity = ((meta.st_size() - 1) / DISK_BLK_SIZE) + 1;
+        self.config_size = size_of::<virtio_blk_config>() as u32;
+        self.drive = Some(drive);
+    }
+}
+
+impl Default for VirtioBlk {
+    fn default() -> Self {
         let mut config = virtio_blk_config::default();
-        config.capacity = ((meta.st_size() - 1) / DISK_BLK_SIZE) + 1;
+        config.capacity = 0;
         VirtioBlk {
             config,
-            config_size: size_of::<virtio_blk_config>() as u32,
-            drive,
+            config_size: 0,
+            drive: None,
         }
     }
 }
 impl VirtioDev for VirtioBlk {
-    // add code here
+    fn get_config(&mut self) -> &mut dyn VirtioConfig {
+        let base = &self.config as *const _ as *const u8;
+        &mut self.config
+    }
+
+    fn get_conf_size(&self) -> u32 {
+        self.config_size
+    }
+
     fn process_chain(
         &mut self,
         queue: &mut VirtioQueue,
@@ -62,6 +79,10 @@ impl VirtioDev for VirtioBlk {
         //     u8 status
         // This is not directly specified in virtio specification.
         //
+
+        if self.drive.is_none() {
+            return Err(());
+        }
 
         let head_addr = queue.queue_desc_low + 16 * head_idx as u32;
         let head_desc = Descriptor::read(head_addr, ram);
@@ -91,9 +112,15 @@ impl VirtioDev for VirtioBlk {
                 // read
                 let mut buf = vec![0u8; data_desc.len as usize];
                 self.drive
+                    .as_ref()
+                    .unwrap()
                     .seek(SeekFrom::Start(sector * 512))
                     .map_err(|_| ())?;
-                self.drive.read(&mut buf).map_err(|_| ())?;
+                self.drive
+                    .as_ref()
+                    .unwrap()
+                    .read(&mut buf)
+                    .map_err(|_| ())?;
                 for i in 0..(data_desc.len as usize) {
                     ram.store_byte(data_desc.addr as u32 + i as u32, buf[i]);
                 }
@@ -105,9 +132,15 @@ impl VirtioDev for VirtioBlk {
                     buf[i] = ram.load_byte(data_desc.addr as u32 + i as u32);
                 }
                 self.drive
+                    .as_ref()
+                    .unwrap()
                     .seek(SeekFrom::Start(sector * 512))
                     .map_err(|_| ())?;
-                self.drive.write(&mut buf).map_err(|_| ())?;
+                self.drive
+                    .as_ref()
+                    .unwrap()
+                    .write(&mut buf)
+                    .map_err(|_| ())?;
             }
             _ => {
                 // unsuported or not valid

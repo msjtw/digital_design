@@ -29,10 +29,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         clint: clint::Clint::default(),
     };
 
+    let mut vblk = virtio_blk::VirtioBlk::default();
+    vblk.init();
     let mut bus = memory::MemoryBus {
         ram: ram::RAM::default(),
         uart: ns16550::Uart::default(),
-        blk: virtio::VirtioDevice::default(),
+        blk: virtio::VirtioDevice::new(Box::new(vblk)),
         plic: plic::Plic::default(),
     };
 
