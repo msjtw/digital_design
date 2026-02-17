@@ -1,6 +1,7 @@
 mod core;
 mod device;
 mod memory;
+use clap::Parser;
 use core::Core;
 use std::env;
 use std::error::Error;
@@ -17,12 +18,24 @@ const SPIKE_DEBUG: bool = true;
 const PRINT_START: u64 = 0 as u64;
 const REAL_TIME: bool = false;
 
+/// RISCV (rv32ima) emulator
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// bios loaded at 0x8000000
+    #[arg(short, long)]
+    bios: Option<String>,
+
+    /// kernel loaded at 0x80200000
+    #[arg(short, long)]
+    kernel: Option<String>,
+
+    #[arg(short, long)]
+    drive: Option<String>,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        println!("Wrong arguments!");
-        process::exit(1);
-    }
+    let args = Args::parse();
 
     let mut hart = core::Hart {
         core: Core::default(),
@@ -30,7 +43,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let mut vblk = virtio_blk::VirtioBlk::default();
-    vblk.init();
+
+    if args.bios.is_none() {
+        println!("Wrong arguments!");
+        process::exit(1);
+    }
+    if args.drive.is_some() {
+        vblk.init(&args.drive.unwrap());
+    }
+
     let mut bus = memory::MemoryBus {
         ram: ram::RAM::default(),
         uart: ns16550::Uart::default(),
@@ -41,7 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     core::soc_init(
         &mut hart,
         &mut bus,
-        &args[1], //kernel Image
+        &args.bios.unwrap(), //kernel Image
         "/home/msjtw/Documents/digital_design/riscv_em/device_tree/spike.dtb",
     )?;
 

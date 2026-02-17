@@ -54,11 +54,6 @@ impl Default for VirtioQueue {
 }
 
 pub struct VirtioMmio<const QCOUNT: usize> {
-    pub base: u32,
-    pub length: u32,
-    pub interrupt_id: usize,
-
-    pub device_id: u32,
 
     pub device_features: [u32; 2],
     pub device_features_sel: usize,
@@ -77,6 +72,9 @@ pub struct VirtioMmio<const QCOUNT: usize> {
 }
 
 pub struct VirtioDevice {
+    base: u32,
+    length: u32,
+    interrupt_id: u32,
     pub mmio: VirtioMmio<1>,
     pub device: Box<dyn VirtioDev>,
 }
@@ -84,11 +82,10 @@ pub struct VirtioDevice {
 impl VirtioDevice {
     pub fn new(dev: Box<dyn VirtioDev>) -> Self {
         VirtioDevice {
+            base: 0x4200000,
+            length: 0x200,
+            interrupt_id: 3,
             mmio: VirtioMmio::<1> {
-                base: 0x4200000,
-                length: 0x200,
-                interrupt_id: 3,
-                device_id: 2,
                 device_features: [0, 1],
                 device_features_sel: 0,
                 driver_features: [0; 2],
@@ -110,17 +107,20 @@ impl VirtioDevice {
         if self.device.get_conf_size() == 0 {
             return false;
         }
-        if addr >= self.mmio.base && addr < self.mmio.base + self.mmio.length {
+        if addr >= self.base && addr < self.base + self.length {
             return true;
         }
         return false;
     }
 
     pub fn tick(&mut self, plic: &mut Plic, ram: &mut RAM) {
+        if self.device.get_conf_size() == 0 {
+            return;
+        }
         if self.mmio.interrupt_status > 0 {
-            plic.intt_active |= 1 << self.mmio.interrupt_id;
+            plic.intt_active |= 1 << self.interrupt_id;
         } else {
-            plic.intt_active &= !(1 << self.mmio.interrupt_id);
+            plic.intt_active &= !(1 << self.interrupt_id);
         }
 
         if self.mmio.status & STATUS_NEEDS_RESET > 0 {
@@ -140,7 +140,7 @@ impl VirtioDevice {
     }
 
     pub fn write(&mut self, addr: u32, data: u32) {
-        let addr = addr - self.mmio.base;
+        let addr = addr - self.base;
         match addr {
             _DeviceFeaturesSel => {
                 if data > 1 {
@@ -212,11 +212,11 @@ impl VirtioDevice {
     }
 
     pub fn read(&mut self, addr: u32) -> u32 {
-        let addr = addr - self.mmio.base;
+        let addr = addr - self.base;
         let val = match addr {
             _MagicValue => 0x74726976,
             _Version => 0x2,
-            _DeviceID => self.mmio.device_id,
+            _DeviceID => self.device.get_device_id(),
             _VendorID => 0x0,
             _DeviceFeatures => self.mmio.device_features[self.mmio.device_features_sel],
             _QueueSizeMax => self.mmio.queues[self.mmio.queue_sel].queue_size_max as u32,
@@ -248,10 +248,6 @@ impl VirtioDevice {
 
     fn reset(&mut self) {
         self.mmio = VirtioMmio::<1> {
-            base: 0x4200000,
-            length: 0x200,
-            interrupt_id: 3,
-            device_id: 2,
             device_features: [0, 1],
             device_features_sel: 0,
             driver_features: [0; 2],
@@ -317,6 +313,7 @@ impl VirtioDevice {
 pub trait VirtioDev {
     fn get_config(&mut self) -> &mut dyn VirtioConfig;
     fn get_conf_size(&self) -> u32;
+    fn get_device_id(&self) -> u32;
 
     fn process_chain(
         &mut self,
@@ -331,9 +328,9 @@ pub trait VirtioConfig {
         let base = self as *const _ as *const u8;
         unsafe {
             let d = *base.add(addr) as u32;
-            let c = *base.add(addr+1) as u32;
-            let b = *base.add(addr+2) as u32;
-            let a = *base.add(addr+3) as u32;
+            let c = *base.add(addr + 1) as u32;
+            let b = *base.add(addr + 2) as u32;
+            let a = *base.add(addr + 3) as u32;
             (a << 24) + (b << 16) + (c << 8) + d
         }
     }
@@ -346,9 +343,9 @@ pub trait VirtioConfig {
         let a: u8 = ((data & mask << 24) >> 24) as u8;
         unsafe {
             *base.add(addr) = d;
-            *base.add(addr+1) = c;
-            *base.add(addr+2) = b;
-            *base.add(addr+3) = a;
+            *base.add(addr + 1) = c;
+            *base.add(addr + 2) = b;
+            *base.add(addr + 3) = a;
         }
     }
 }

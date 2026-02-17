@@ -28,6 +28,9 @@ impl RAM {
 
     pub fn load_word(&self, addr: u32) -> u32 {
         let address = (addr - self.base) as usize;
+        if address > RAM_SIZE as usize {
+            println!("0x{:08x}", addr);
+        }
         let d = self.data[address] as u32;
         let c = self.data[address + 1] as u32;
         let b = self.data[address + 2] as u32;

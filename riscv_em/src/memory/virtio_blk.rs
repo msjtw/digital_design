@@ -19,14 +19,15 @@ const VIRTIO_BLK_S_UNSUPP: u8 = 2;
 const DISK_BLK_SIZE: u64 = 512;
 
 pub struct VirtioBlk {
+    pub device_id: u32,
     pub config: virtio_blk_config,
     pub config_size: u32,
     pub drive: Option<File>,
 }
 
 impl VirtioBlk {
-    pub fn init(&mut self) {
-        let drive = match OpenOptions::new().read(true).write(true).open("disk_file") {
+    pub fn init(&mut self, drive: &str) {
+        let drive = match OpenOptions::new().read(true).write(true).open(drive) {
             Ok(file) => file,
             Err(err) => panic!("disk file error: {:?}", err),
         };
@@ -46,6 +47,7 @@ impl Default for VirtioBlk {
         let mut config = virtio_blk_config::default();
         config.capacity = 0;
         VirtioBlk {
+            device_id: 2,
             config,
             config_size: 0,
             drive: None,
@@ -54,12 +56,15 @@ impl Default for VirtioBlk {
 }
 impl VirtioDev for VirtioBlk {
     fn get_config(&mut self) -> &mut dyn VirtioConfig {
-        let base = &self.config as *const _ as *const u8;
         &mut self.config
     }
 
     fn get_conf_size(&self) -> u32 {
         self.config_size
+    }
+
+    fn get_device_id(&self) -> u32 {
+        self.device_id
     }
 
     fn process_chain(
