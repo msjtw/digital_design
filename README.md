@@ -10,10 +10,10 @@ Features:
 - virtual memory 
 - ns16550a uart
 - minimal plic
+- virtio-blk device
 
 What is missing:
 - c extension (no compressed instructions)
-- external devices like block device
 
 To run it you need to build a buildroot image and link it into a single binary with OpenSBI (FW_PAYLOAD).
 Or you can use the image from ```image/Image```.
