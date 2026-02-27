@@ -1,6 +1,5 @@
-use std::io::{Bytes, Read, Stdout, Write};
+use std::io::{Bytes, Read, Write};
 use termion::async_stdin;
-use termion::raw::{IntoRawMode, RawTerminal};
 
 use super::plic::Plic;
 
@@ -10,8 +9,7 @@ pub struct Uart {
     interrupt_id: usize,
 
     stdin: Bytes<termion::AsyncReader>,
-    // stdout: RawTerminal<Stdout>,
-    stdout: Stdout,
+    stdout: Box<dyn Write>,
     bytes_to_read: u8,
 
     dll: u8,
@@ -28,15 +26,14 @@ pub struct Uart {
     rhr_interrupt: bool,
 }
 
-impl Default for Uart {
-    fn default() -> Self {
+impl Uart {
+    pub fn new(out: Box<dyn Write>) -> Self {
         Uart {
             base: 0x10000000,
             length: 0x100,
             interrupt_id: 1,
             stdin: async_stdin().bytes(),
-            // stdout: std::io::stdout().into_raw_mode().unwrap(),
-            stdout: std::io::stdout(),
+            stdout: out,
             bytes_to_read: 0,
             dll: 0,
             dlh: 0,
@@ -51,9 +48,7 @@ impl Default for Uart {
             rhr_interrupt: false,
         }
     }
-}
 
-impl Uart {
     pub fn claim(&self, addr: u32) -> bool {
         if addr >= self.base && addr < self.base + self.length {
             return true;
@@ -103,7 +98,7 @@ impl Uart {
                 if self.lcr & (1 << 7) != 0 {
                     self.dll = data;
                 } else {
-                    write!(self.stdout, "{}",data as char).unwrap();
+                    write!(self.stdout, "{}", data as char).unwrap();
                     self.stdout.flush().unwrap();
                     self.thr_interrupt = true;
                 }

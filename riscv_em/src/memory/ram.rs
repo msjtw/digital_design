@@ -64,12 +64,13 @@ impl RAM {
     }
     pub fn store_hword(&mut self, addr: u32, data: u16) {
         let address = (addr - self.base) as usize;
-        let mask: u16 = (2 << 8) - 1;
+        let mask: u16 = (1 << 8) - 1;
         let d: u8 = (data & mask) as u8;
         let c: u8 = ((data & mask << 8) >> 8) as u8;
         self.data[address] = d;
         self.data[address + 1] = c;
     }
+
     pub fn store_byte(&mut self, addr: u32, data: u8) {
         let address = (addr - self.base) as usize;
         self.data[address] = data;

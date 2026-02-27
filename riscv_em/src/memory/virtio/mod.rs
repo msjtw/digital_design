@@ -2,7 +2,7 @@
 pub mod registers;
 use registers::*;
 
-use crate::memory::{virtio_blk::VirtioBlk, *};
+use crate::memory::*;
 
 #[derive(Debug, Default)]
 pub struct Descriptor {
@@ -54,7 +54,6 @@ impl Default for VirtioQueue {
 }
 
 pub struct VirtioMmio<const QCOUNT: usize> {
-
     pub device_features: [u32; 2],
     pub device_features_sel: usize,
     pub driver_features: [u32; 2],
@@ -66,7 +65,7 @@ pub struct VirtioMmio<const QCOUNT: usize> {
     pub queue_notify_pending: bool,
 
     pub interrupt_status: u32,
-    pub interrupt_ack: u32,
+    // pub interrupt_ack: u32,
     pub status: u32,
     pub config_generation: u32,
 }
@@ -95,7 +94,7 @@ impl VirtioDevice {
                 queue_notify: 0,
                 queue_notify_pending: false,
                 interrupt_status: 0,
-                interrupt_ack: 0,
+                // interrupt_ack: 0,
                 status: 0,
                 config_generation: 0,
             },
@@ -257,7 +256,7 @@ impl VirtioDevice {
             queue_notify: 0,
             queue_notify_pending: false,
             interrupt_status: 0,
-            interrupt_ack: 0,
+            // interrupt_ack: 0,
             status: 0,
             config_generation: 0,
         }
@@ -286,7 +285,7 @@ impl VirtioDevice {
             }
 
             let used_queue_idx = used_idx % queue.queue_size; // ring index of last unread head
-            let used_ring_addr = queue.queue_driver_low + 4 + (8 * used_queue_idx as u32);
+            let used_ring_addr = queue.queue_device_low + 4 + (8 * used_queue_idx as u32);
             ram.store_word(used_ring_addr, head_idx as u32);
             ram.store_word(used_ring_addr + 4, nbytes);
 

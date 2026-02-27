@@ -88,27 +88,31 @@ impl VirtioDev for VirtioBlk {
         if self.drive.is_none() {
             return Err(());
         }
+        // println!("idx: {}", head_idx);
 
         let head_addr = queue.queue_desc_low + 16 * head_idx as u32;
         let head_desc = Descriptor::read(head_addr, ram);
-        let op_type = ram.load_word(head_desc.addr as u32);
-
+        // println!("{:?}", head_desc);
         if head_desc.flags & VIRTQ_DESC_F_NEXT == 0 {
             return Err(());
         }
+        let op_type = ram.load_word(head_desc.addr as u32);
+        // skip reserved
+        let sector_low = ram.load_word(head_desc.addr as u32 + 8) as u64;
+        let sector_hig = ram.load_word(head_desc.addr as u32 + 12) as u64;
+        let sector = (sector_hig << 32) + sector_low;
+
         let data_addr = queue.queue_desc_low + (16 * head_desc.next as u32);
         let data_desc = Descriptor::read(data_addr, ram);
         if data_desc.flags & VIRTQ_DESC_F_NEXT == 0 {
             return Err(());
         }
+
         let status_addr = queue.queue_desc_low + (16 * data_desc.next as u32);
         let status_desc = Descriptor::read(status_addr, ram);
         if status_desc.flags & VIRTQ_DESC_F_NEXT != 0 {
             return Err(());
         }
-
-        // skip reserved
-        let sector = ram.load_word(head_desc.addr as u32 + 8) as u64;
 
         // FIX: Add check if sector in range. Write VIRTIO_BLK_S_IOERR to status.
 

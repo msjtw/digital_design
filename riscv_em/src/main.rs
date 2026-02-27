@@ -3,9 +3,9 @@ mod device;
 mod memory;
 use clap::Parser;
 use core::Core;
-use std::env;
-use std::error::Error;
 use std::process;
+use std::{error::Error, io::stdout};
+use termion::raw::IntoRawMode;
 
 use std::time::SystemTime;
 
@@ -32,6 +32,9 @@ struct Args {
 
     #[arg(short, long)]
     drive: Option<String>,
+
+    #[arg(short, long)]
+    cooked: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -48,13 +51,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Wrong arguments!");
         process::exit(1);
     }
+
     if args.drive.is_some() {
         vblk.init(&args.drive.unwrap());
     }
 
+    let uart = match args.cooked {
+        false => ns16550::Uart::new(Box::new(stdout().into_raw_mode().unwrap())),
+        true => ns16550::Uart::new(Box::new(stdout())),
+    };
+
     let mut bus = memory::MemoryBus {
         ram: ram::RAM::default(),
-        uart: ns16550::Uart::default(),
+        uart: uart,
         blk: virtio::VirtioDevice::new(Box::new(vblk)),
         plic: plic::Plic::default(),
     };
