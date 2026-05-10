@@ -24,7 +24,7 @@ const REAL_TIME: bool = false;
 struct Args {
     /// bios loaded at 0x8000000
     #[arg(short, long)]
-    bios: Option<String>,
+    bios: String,
 
     /// kernel loaded at 0x80200000
     #[arg(short, long)]
@@ -47,13 +47,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut vblk = virtio_blk::VirtioBlk::default();
 
-    if args.bios.is_none() {
-        println!("Wrong arguments!");
-        process::exit(1);
-    }
+    // if args.bios.is_none() {
+    //     println!("Wrong arguments!");
+    //     process::exit(1);
+    // }
 
-    if args.drive.is_some() {
-        vblk.init(&args.drive.unwrap());
+    if let Some(drive) = args.drive {
+        vblk.init(&drive);
     }
 
     let uart = match args.cooked {
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     core::soc_init(
         &mut hart,
         &mut bus,
-        &args.bios.unwrap(), //kernel Image
+        &args.bios, //kernel Image
         "/home/msjtw/Documents/digital_design/riscv_em/device_tree/spike.dtb",
     )?;
 

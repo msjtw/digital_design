@@ -21,8 +21,10 @@ Or you can use the image from ```image/Image```.
 ```bash
 cd riscv_em
 cargo build -r
-./target/release/riscv_em ../image/Image   
+./target/release/riscv_em -b ../image/Image   
 ```
+
+Because it usees `termion` for terminal interaction it won't run on windows.
 
 ## instr
 It's the decoding function extracted from the main emulator.
